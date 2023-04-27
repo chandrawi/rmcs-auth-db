@@ -1,6 +1,6 @@
 CREATE TABLE `api` (
   `api_id` smallint(5) UNSIGNED NOT NULL,
-  `api_name` varchar(32) NOT NULL,
+  `name` varchar(32) NOT NULL,
   `kind` enum('RESOURCE','APPLICATION') NOT NULL,
   `address` varchar(64) NOT NULL,
   `description` varchar(255) NOT NULL
@@ -16,7 +16,7 @@ CREATE TABLE `api_procedure` (
 
 ALTER TABLE `api`
   ADD PRIMARY KEY (`api_id`),
-  ADD UNIQUE KEY `api_name` (`api_name`);
+  ADD UNIQUE KEY `name` (`name`);
 
 ALTER TABLE `api_procedure`
   ADD PRIMARY KEY (`procedure_id`),
