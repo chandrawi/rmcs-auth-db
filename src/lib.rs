@@ -1,3 +1,5 @@
+pub mod schema;
+
 use sqlx::Pool;
 use sqlx::mysql::{MySql, MySqlPoolOptions};
 use sqlx::types::chrono::{DateTime, Utc};
