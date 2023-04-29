@@ -97,6 +97,87 @@ mod tests {
         assert!(try_procedure.is_err());
         assert!(try_resource.is_err());
 
+        // create new Application config API and procedure
+        let app_id = auth.create_application("NewApp", "localhost", None).await.unwrap();
+        let proc_id = auth.create_procedure(app_id, "NewService", "NewProcedure", None).await.unwrap();
+
+        // create new role and add access to the procedure
+        let role_id = auth.create_role("user", true, false, None, None).await.unwrap();
+        auth.add_role_access(role_id, proc_id).await.unwrap();
+
+        // create new user and token
+        let user_id = auth.create_user(role_id, "username", "secret", "", "", None, None).await.unwrap();
+        let token_id = "ANxYLOpYMEUo1s78YMsu8Su1VomCnCQo";
+        let expire = DateTime::from_str("2023-01-01T00:00:00Z").unwrap();
+        auth.create_token(token_id, role_id, user_id, Some(expire), None, None).await.unwrap();
+
+        // get role data
+        let roles = auth.list_role().await.unwrap();
+        let last_role = roles.into_iter().last().unwrap();
+        let role = auth.read_role(role_id).await.unwrap();
+
+        assert_eq!(last_role.id, role_id);
+        assert_eq!(
+            (role.name.clone(), role.secured, role.multi, role.access),
+            ("user".to_owned(), true, false, vec![proc_id])
+        );
+
+        // get user data
+        let users = auth.list_user_by_role(role_id).await.unwrap();
+        let last_user = users.into_iter().last().unwrap();
+        let user = auth.read_user(user_id).await.unwrap();
+
+        assert_eq!(last_user.id, user.id);
+        assert_eq!(
+            (user.name.clone(), user.password.clone()),
+            ("username".to_owned(), "secret".to_owned())
+        );
+
+        // get token data
+        let role_tokens = auth.list_token_by_user(user_id).await.unwrap();
+        let user_tokens = auth.list_token_by_user(user_id).await.unwrap();
+        let role_token = role_tokens.into_iter().last().unwrap();
+        let user_token = user_tokens.into_iter().last().unwrap();
+        let token = auth.read_token(token_id).await.unwrap();
+
+        assert_eq!(role_token.id, token_id);
+        assert_eq!(user_token.id, token_id);
+        assert_eq!(
+            (token.role_id, token.user_id, token.limit, token.expire),
+            (role_id, user_id, 0, expire)
+        );
+
+        // update role and user
+        auth.update_role(role_id, None, None, Some(true), Some(43200), Some(10000)).await.unwrap();
+        auth.update_user(user_id, None, None, None, None, Some("user@domain.com"), Some("+6280123456789")).await.unwrap();
+
+        // get role and user by name
+        let role = auth.read_role_by_name(&role.name.clone()).await.unwrap();
+        let user = auth.read_user_by_name(&user.name.clone()).await.unwrap();
+
+        assert_eq!(
+            (role.multi, role.token_expire, role.token_limit),
+            (true, 43200, 10000)
+        );
+        assert_eq!(
+            (user.email, user.phone),
+            ("user@domain.com".to_owned(), "+6280123456789".to_owned())
+        );
+
+        // delete role, user, and token
+        auth.delete_token(token_id).await.unwrap();
+        auth.delete_user(user_id).await.unwrap();
+        auth.remove_role_access(role_id, proc_id).await.unwrap();
+        auth.delete_role(role_id).await.unwrap();
+
+        let try_token = auth.read_token(token_id).await;
+        let try_user = auth.read_user(user_id).await;
+        let try_role = auth.read_role(role_id).await;
+
+        assert!(try_token.is_err());
+        assert!(try_user.is_err());
+        assert!(try_role.is_err());
+
         // drop tables after testing
         sqlx::migrate!().undo(&auth.pool, 2).await.unwrap();
     }
