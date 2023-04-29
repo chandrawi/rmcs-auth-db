@@ -236,3 +236,184 @@ pub(crate) async fn delete_api(pool: &Pool<MySql>,
 
     Ok(())
 }
+
+async fn select_procedure(pool: &Pool<MySql>, 
+    selector: ProcedureSelector
+) -> Result<ProcedureFields, Error> 
+{
+    let mut stmt = Query::select()
+        .columns([
+            ApiProcedure::ApiId,
+            ApiProcedure::ProcedureId,
+            ApiProcedure::Service,
+            ApiProcedure::Procedure,
+            ApiProcedure::Description
+        ])
+        .from(ApiProcedure::Table)
+        .to_owned();
+
+    match selector {
+        ProcedureSelector::Id(id) => {
+            stmt = stmt.and_where(Expr::col(ApiProcedure::ProcedureId).eq(id)).to_owned();
+        },
+        ProcedureSelector::Name((api_id, service, procedure)) => {
+            stmt = stmt
+                .and_where(Expr::col(ApiProcedure::ApiId).eq(api_id))
+                .and_where(Expr::col(ApiProcedure::Service).eq(service))
+                .and_where(Expr::col(ApiProcedure::Procedure).eq(procedure))
+                .to_owned();
+        }
+    }
+    let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
+
+    let row = sqlx::query_with(&sql, values)
+        .map(|row: MySqlRow| {
+            ProcedureFields {
+                api_id: row.get(0),
+                id: row.get(1),
+                service: row.get(2),
+                procedure: row.get(3),
+                description: row.get(4)
+            }
+        })
+        .fetch_one(pool)
+        .await?;
+
+    Ok(row)
+}
+
+pub(crate) async fn select_procedure_by_id(pool: &Pool<MySql>, 
+    id: u32
+) -> Result<ProcedureFields, Error> 
+{
+    select_procedure(pool, ProcedureSelector::Id(id)).await
+}
+
+pub(crate) async fn select_procedure_by_name(pool: &Pool<MySql>, 
+    api_id: u32,
+    service: &str,
+    name: &str
+) -> Result<ProcedureFields, Error> 
+{
+    select_procedure(pool, ProcedureSelector::Name((api_id, service.to_owned(), name.to_owned()))).await
+}
+
+pub(crate) async fn select_multiple_procedure(pool: &Pool<MySql>, 
+    api_id: u32
+) -> Result<Vec<ProcedureFields>, Error> 
+{
+    let (sql, values) = Query::select()
+        .columns([
+            ApiProcedure::ApiId,
+            ApiProcedure::ProcedureId,
+            ApiProcedure::Service,
+            ApiProcedure::Procedure,
+            ApiProcedure::Description
+        ])
+        .from(ApiProcedure::Table)
+        .and_where(Expr::col(ApiProcedure::ApiId).eq(api_id.to_string()))
+        .build_sqlx(MysqlQueryBuilder);
+
+    let rows = sqlx::query_with(&sql, values)
+        .map(|row: MySqlRow| {
+            ProcedureFields {
+                api_id: row.get(0),
+                id: row.get(1),
+                service: row.get(2),
+                procedure: row.get(3),
+                description: row.get(4)
+            }
+        })
+        .fetch_all(pool)
+        .await?;
+
+    Ok(rows)
+}
+
+pub(crate) async fn insert_procedure(pool: &Pool<MySql>, 
+    api_id: u32,
+    service: &str,
+    name: &str,
+    description: Option<&str>
+) -> Result<u32, Error> 
+{
+    let (sql, values) = Query::insert()
+        .into_table(ApiProcedure::Table)
+        .columns([
+            ApiProcedure::ApiId,
+            ApiProcedure::Service,
+            ApiProcedure::Procedure,
+            ApiProcedure::Description
+        ])
+        .values([
+            api_id.into(),
+            service.into(),
+            name.into(),
+            description.unwrap_or_default().into()
+        ])
+        .unwrap_or(&mut sea_query::InsertStatement::default())
+        .build_sqlx(MysqlQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .execute(pool)
+        .await?;
+
+    let sql = Query::select()
+        .expr(Func::max(Expr::col(ApiProcedure::ProcedureId)))
+        .from(ApiProcedure::Table)
+        .to_string(MysqlQueryBuilder);
+    let id: u32 = sqlx::query(&sql)
+        .map(|row: MySqlRow| row.get(0))
+        .fetch_one(pool)
+        .await?;
+
+    Ok(id)
+}
+
+pub(crate) async fn update_procedure(pool: &Pool<MySql>, 
+    id: u32,
+    service: Option<&str>,
+    name: Option<&str>,
+    description: Option<&str>
+) -> Result<(), Error> 
+{
+    let mut stmt = Query::update()
+        .table(ApiProcedure::Table)
+        .to_owned();
+
+    if let Some(value) = service {
+        stmt = stmt.value(ApiProcedure::Service, value).to_owned()
+    }
+    if let Some(value) = name {
+        stmt = stmt.value(ApiProcedure::Procedure, value).to_owned()
+    }
+    if let Some(value) = description {
+        stmt = stmt.value(ApiProcedure::Description, value).to_owned()
+    }
+
+    let (sql, values) = stmt
+        .and_where(Expr::col(ApiProcedure::ProcedureId).eq(id))
+        .build_sqlx(MysqlQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub(crate) async fn delete_procedure(pool: &Pool<MySql>, 
+    id: u32
+) -> Result<(), Error> 
+{
+    let (sql, values) = Query::delete()
+        .from_table(ApiProcedure::Table)
+        .and_where(Expr::col(ApiProcedure::ProcedureId).eq(id))
+        .build_sqlx(MysqlQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}

@@ -159,4 +159,46 @@ impl Auth {
         .await
     }
 
+    pub async fn read_procedure(&self, id: u32)
+        -> Result<ProcedureFields, sqlx::Error>
+    {
+        api::select_procedure_by_id(&self.pool, id)
+        .await
+    }
+
+    pub async fn list_procedure_by_api(&self, api_id: u32)
+        -> Result<Vec<ProcedureFields>, sqlx::Error>
+    {
+        api::select_multiple_procedure(&self.pool, api_id)
+        .await
+    }
+
+    pub async fn read_procedure_by_name(&self, api_id: u32, service: &str, name: &str)
+        -> Result<ProcedureFields, sqlx::Error>
+    {
+        api::select_procedure_by_name(&self.pool, api_id, service, name)
+        .await
+    }
+
+    pub async fn create_procedure(&self, api_id: u32, service: &str, name: &str, description: Option<&str>)
+        -> Result<u32, sqlx::Error>
+    {
+        api::insert_procedure(&self.pool, api_id, service, name, description)
+        .await
+    }
+
+    pub async fn update_procedure(&self, id: u32, service: Option<&str>, name: Option<&str>, description: Option<&str>)
+        -> Result<(), sqlx::Error>
+    {
+        api::update_procedure(&self.pool, id, service, name, description)
+        .await
+    }
+
+    pub async fn delete_procedure(&self, id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        api::delete_procedure(&self.pool, id)
+        .await
+    }
+
 }
