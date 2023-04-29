@@ -6,7 +6,11 @@ use sqlx::mysql::{MySql, MySqlPoolOptions};
 use sqlx::types::chrono::{DateTime, Utc};
 
 use schema::api::{ApiKind, ApiFields, ProcedureFields};
+use schema::auth_role::RoleFields;
+use schema::auth_user::UserFields;
 use operation::api;
+use operation::role;
+use operation::user;
 
 pub struct Auth {
     pub pool: Pool<MySql>,
@@ -254,6 +258,48 @@ impl Auth {
         -> Result<(), sqlx::Error>
     {
         role::remove_role_access(&self.pool, id, procedure_id)
+        .await
+    }
+
+    pub async fn read_user(&self, id: u32)
+        -> Result<UserFields, sqlx::Error>
+    {
+        user::select_user_by_id(&self.pool, id)
+        .await
+    }
+
+    pub async fn read_user_by_name(&self, name: &str)
+        -> Result<UserFields, sqlx::Error>
+    {
+        user::select_user_by_name(&self.pool, name)
+        .await
+    }
+
+    pub async fn list_user_by_role(&self, role_id: u32)
+        -> Result<Vec<UserFields>, sqlx::Error>
+    {
+        user::select_multiple_user_by_role(&self.pool, role_id)
+        .await
+    }
+
+    pub async fn create_user(&self, role_id: u32, name: &str, password: &str, public_key: &str, private_key: &str, email: Option<&str>, phone: Option<&str>)
+        -> Result<u32, sqlx::Error>
+    {
+        user::insert_user(&self.pool, role_id, name, password, public_key, private_key, email, phone)
+        .await
+    }
+
+    pub async fn update_user(&self, id: u32, name: Option<&str>, password: Option<&str>, public_key: Option<&str>, private_key: Option<&str>, email: Option<&str>, phone: Option<&str>)
+        -> Result<(), sqlx::Error>
+    {
+        user::update_user(&self.pool, id, name, password, public_key, private_key, email, phone)
+        .await
+    }
+
+    pub async fn delete_user(&self, id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        user::delete_user(&self.pool, id)
         .await
     }
 
