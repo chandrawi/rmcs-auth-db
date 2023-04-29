@@ -8,9 +8,11 @@ use sqlx::types::chrono::{DateTime, Utc};
 use schema::api::{ApiKind, ApiFields, ProcedureFields};
 use schema::auth_role::RoleFields;
 use schema::auth_user::UserFields;
+use schema::auth_token::TokenFields;
 use operation::api;
 use operation::role;
 use operation::user;
+use operation::token;
 
 pub struct Auth {
     pub pool: Pool<MySql>,
@@ -300,6 +302,41 @@ impl Auth {
         -> Result<(), sqlx::Error>
     {
         user::delete_user(&self.pool, id)
+        .await
+    }
+
+    pub async fn read_token(&self, id: &str)
+        -> Result<TokenFields, sqlx::Error>
+    {
+        token::select_token(&self.pool, id)
+        .await
+    }
+
+    pub async fn list_token_by_role(&self, role_id: u32)
+        -> Result<Vec<TokenFields>, sqlx::Error>
+    {
+        token::select_multiple_token_by_role(&self.pool, role_id)
+        .await
+    }
+
+    pub async fn list_token_by_user(&self, user_id: u32)
+        -> Result<Vec<TokenFields>, sqlx::Error>
+    {
+        token::select_multiple_token_by_user(&self.pool, user_id)
+        .await
+    }
+
+    pub async fn create_token(&self, id: &str, role_id: u32, user_id: u32, expire: Option<DateTime<Utc>>, limit: Option<u32>, ip: Option<Vec<u8>>)
+        -> Result<(), sqlx::Error>
+    {
+        token::insert_token(&self.pool, id, role_id, user_id, expire, limit, ip)
+        .await
+    }
+
+    pub async fn delete_token(&self, id: &str)
+        -> Result<(), sqlx::Error>
+    {
+        token::delete_token(&self.pool, id)
         .await
     }
 
