@@ -201,4 +201,60 @@ impl Auth {
         .await
     }
 
+    pub async fn read_role(&self, id: u32)
+        -> Result<RoleFields, sqlx::Error>
+    {
+        role::select_role_by_id(&self.pool, id)
+        .await
+    }
+
+    pub async fn read_role_by_name(&self, name: &str)
+        -> Result<RoleFields, sqlx::Error>
+    {
+        role::select_role_by_name(&self.pool, name)
+        .await
+    }
+
+    pub async fn list_role(&self)
+        -> Result<Vec<RoleFields>, sqlx::Error>
+    {
+        role::select_role_all(&self.pool)
+        .await
+    }
+
+    pub async fn create_role(&self, name: &str, secured: bool, multi: bool, token_expire: Option<u32>, token_limit: Option<u32>)
+        -> Result<u32, sqlx::Error>
+    {
+        role::insert_role(&self.pool, name, secured, multi, token_expire, token_limit)
+        .await
+    }
+
+    pub async fn update_role(&self, id: u32, name: Option<&str>, secured: Option<bool>, multi: Option<bool>, token_expire: Option<u32>, token_limit: Option<u32>)
+        -> Result<(), sqlx::Error>
+    {
+        role::update_role(&self.pool, id, name, secured, multi, token_expire, token_limit)
+        .await
+    }
+
+    pub async fn delete_role(&self, id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        role::delete_role(&self.pool, id)
+        .await
+    }
+
+    pub async fn add_role_access(&self, id: u32, procedure_id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        role::add_role_access(&self.pool, id, procedure_id)
+        .await
+    }
+
+    pub async fn remove_role_access(&self, id: u32, procedure_id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        role::remove_role_access(&self.pool, id, procedure_id)
+        .await
+    }
+
 }
