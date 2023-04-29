@@ -52,6 +52,51 @@ mod tests {
         // create tables for testing
         sqlx::migrate!().run(&auth.pool).await.unwrap();
 
+        // create new resource API
+        auth.create_resource("NewAPI", "localhost", None).await.unwrap();
+        // get newly created resource at the last of resource API list
+        let resources = auth.list_resource().await.unwrap();
+        let resource = resources.into_iter().last().unwrap();
+
+        // create new procedure for newly created resource
+        auth.create_procedure(resource.id, "NewService", "NewProcedure", None).await.unwrap();
+        // get newly created procedure at the last of procedure list
+        let procedures = auth.list_procedure_by_api(resource.id).await.unwrap();
+        let procedure = procedures.into_iter().last().unwrap();
+
+        assert_eq!(
+            (resource.name.clone(), resource.address.clone()), 
+            ("NewAPI".to_owned(), "localhost".to_owned())
+        );
+        assert_eq!(
+            (procedure.api_id.unwrap(), procedure.service.clone(), procedure.procedure.clone()),
+            (resource.id, "NewService".to_owned(), "NewProcedure".to_owned())
+        );
+
+        // update created procedure and resource API
+        auth.update_procedure(procedure.id, None, None, Some("New procedure")).await.unwrap();
+        auth.update_resource(resource.id, None, None, Some("New resource api")).await.unwrap();
+
+        // get updated resource
+        let resource = auth.read_resource_by_name(&resource.name.clone()).await.unwrap();
+        let procedure = auth.read_procedure_by_name(resource.id, &procedure.service.clone(), &procedure.procedure.clone()).await.unwrap();
+        let resource_procedure = resource.procedures.into_iter().last().unwrap();
+
+        assert_eq!(resource.description.unwrap(), "New resource api".to_owned());
+        assert_eq!(procedure.description.unwrap(), "New procedure".to_owned());
+        assert_eq!(procedure.id, resource_procedure.id);
+
+        // delete resource and procedure
+        auth.delete_procedure(procedure.id).await.unwrap();
+        auth.delete_resource(resource.id).await.unwrap();
+
+        // try to get procedure and resource API
+        let try_procedure = auth.read_procedure(procedure.id).await;
+        let try_resource = auth.read_resource(resource.id).await;
+
+        assert!(try_procedure.is_err());
+        assert!(try_resource.is_err());
+
         // drop tables after testing
         sqlx::migrate!().undo(&auth.pool, 2).await.unwrap();
     }
