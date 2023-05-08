@@ -3,7 +3,7 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::api::{Api, ApiProcedure, ApiKind, ApiFields, ApiJoin, ProcedureFields};
+use crate::schema::api::{Api, ApiProcedure, ApiKind, ApiSchema, ApiJoin, ProcedureSchema};
 
 enum ApiSelector {
     Id(u32),
@@ -18,7 +18,7 @@ enum ProcedureSelector {
 async fn select_api(pool: &Pool<MySql>, 
     kind: ApiKind, 
     selector: ApiSelector
-) -> Result<ApiFields, Error>
+) -> Result<ApiSchema, Error>
 {
     let mut stmt = Query::select()
         .columns([
@@ -67,7 +67,7 @@ async fn select_api(pool: &Pool<MySql>,
         .fetch_all(pool)
         .await?;
 
-    let procedures: Vec<ProcedureFields> = rows.iter()
+    let procedures: Vec<ProcedureSchema> = rows.iter()
         .filter(|row| {
             row.procedure_id != None 
             && row.service != None 
@@ -75,23 +75,23 @@ async fn select_api(pool: &Pool<MySql>,
             && row.procedure_description != None
         })
         .map(|row| {
-            ProcedureFields {
+            ProcedureSchema {
                 id: row.procedure_id.unwrap_or_default(),
-                api_id: None,
+                api_id: row.id,
                 service: row.service.clone().unwrap_or_default(),
                 procedure: row.procedure.clone().unwrap_or_default(),
-                description: row.procedure_description.clone()
+                description: row.procedure_description.clone().unwrap_or_default()
             }
         })
         .collect();
     let first_row = rows.iter().next();
 
     match first_row {
-        Some(value) => Ok(ApiFields {
+        Some(value) => Ok(ApiSchema {
                 id: value.id,
                 name: value.name.clone(),
                 address: value.address.clone(),
-                description: Some(value.description.clone()),
+                description: value.description.clone(),
                 procedures
             }),
         None => Err(Error::RowNotFound)
@@ -101,7 +101,7 @@ async fn select_api(pool: &Pool<MySql>,
 pub(crate) async fn select_api_by_id(pool: &Pool<MySql>, 
     kind: ApiKind, 
     id: u32
-) -> Result<ApiFields, Error> 
+) -> Result<ApiSchema, Error> 
 {
     select_api(pool, kind, ApiSelector::Id(id)).await
 }
@@ -109,14 +109,14 @@ pub(crate) async fn select_api_by_id(pool: &Pool<MySql>,
 pub(crate) async fn select_api_by_name(pool: &Pool<MySql>, 
     kind: ApiKind, 
     name: &str
-) -> Result<ApiFields, Error> 
+) -> Result<ApiSchema, Error> 
 {
     select_api(pool, kind, ApiSelector::Name(name.to_owned())).await
 }
 
 pub(crate) async fn select_multiple_api(pool: &Pool<MySql>, 
     kind: ApiKind
-) -> Result<Vec<ApiFields>, Error> 
+) -> Result<Vec<ApiSchema>, Error> 
 {
     let (sql, values) = Query::select()
         .columns([
@@ -131,7 +131,7 @@ pub(crate) async fn select_multiple_api(pool: &Pool<MySql>,
 
     let rows = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            ApiFields {
+            ApiSchema {
                 id: row.get(0),
                 name: row.get(1),
                 address: row.get(2),
@@ -239,7 +239,7 @@ pub(crate) async fn delete_api(pool: &Pool<MySql>,
 
 async fn select_procedure(pool: &Pool<MySql>, 
     selector: ProcedureSelector
-) -> Result<ProcedureFields, Error> 
+) -> Result<ProcedureSchema, Error> 
 {
     let mut stmt = Query::select()
         .columns([
@@ -268,7 +268,7 @@ async fn select_procedure(pool: &Pool<MySql>,
 
     let row = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            ProcedureFields {
+            ProcedureSchema {
                 api_id: row.get(0),
                 id: row.get(1),
                 service: row.get(2),
@@ -284,7 +284,7 @@ async fn select_procedure(pool: &Pool<MySql>,
 
 pub(crate) async fn select_procedure_by_id(pool: &Pool<MySql>, 
     id: u32
-) -> Result<ProcedureFields, Error> 
+) -> Result<ProcedureSchema, Error> 
 {
     select_procedure(pool, ProcedureSelector::Id(id)).await
 }
@@ -293,14 +293,14 @@ pub(crate) async fn select_procedure_by_name(pool: &Pool<MySql>,
     api_id: u32,
     service: &str,
     name: &str
-) -> Result<ProcedureFields, Error> 
+) -> Result<ProcedureSchema, Error> 
 {
     select_procedure(pool, ProcedureSelector::Name((api_id, service.to_owned(), name.to_owned()))).await
 }
 
 pub(crate) async fn select_multiple_procedure(pool: &Pool<MySql>, 
     api_id: u32
-) -> Result<Vec<ProcedureFields>, Error> 
+) -> Result<Vec<ProcedureSchema>, Error> 
 {
     let (sql, values) = Query::select()
         .columns([
@@ -316,7 +316,7 @@ pub(crate) async fn select_multiple_procedure(pool: &Pool<MySql>,
 
     let rows = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            ProcedureFields {
+            ProcedureSchema {
                 api_id: row.get(0),
                 id: row.get(1),
                 service: row.get(2),

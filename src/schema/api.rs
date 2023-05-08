@@ -38,17 +38,15 @@ impl std::string::ToString for ApiKind {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ApiFields {
+pub struct ApiSchema {
     pub id: u32,
     pub name: String,
     pub address: String,
-    pub description: Option<String>,
-    pub procedures: Vec<ProcedureFields>
+    pub description: String,
+    pub procedures: Vec<ProcedureSchema>
 }
 
-#[allow(unused)]
 #[derive(Debug, Default)]
 pub(crate) struct ApiJoin {
     pub(crate) id: u32,
@@ -61,12 +59,11 @@ pub(crate) struct ApiJoin {
     pub(crate) procedure_description: Option<String>
 }
 
-#[allow(unused)]
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ProcedureFields {
+pub struct ProcedureSchema {
     pub id: u32,
-    pub api_id: Option<u32>,
+    pub api_id: u32,
     pub service: String,
     pub procedure: String,
-    pub description: Option<String>
+    pub description: String
 }

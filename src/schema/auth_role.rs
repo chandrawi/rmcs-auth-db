@@ -20,9 +20,8 @@ pub(crate) enum AuthAccess {
     ProcedureId
 }
 
-#[allow(unused)]
-#[derive(Debug, Default, PartialEq)]
-pub struct RoleFields {
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct RoleSchema {
     pub id: u32,
     pub name: String,
     pub secured: bool,
@@ -32,7 +31,6 @@ pub struct RoleFields {
     pub access: Vec<u32>
 }
 
-#[allow(unused)]
 #[derive(Debug, Default)]
 pub(crate) struct RoleJoin {
     pub(crate) id: u32,

@@ -1,6 +1,5 @@
 use sea_query::Iden;
 
-#[allow(unused)]
 #[derive(Iden)]
 pub(crate) enum AuthUser {
     Table,
@@ -14,9 +13,8 @@ pub(crate) enum AuthUser {
     Phone
 }
 
-#[allow(unused)]
-#[derive(Debug, Default, PartialEq)]
-pub struct UserFields {
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct UserSchema {
     pub role_id: u32,
     pub id: u32,
     pub name: String,

@@ -4,7 +4,7 @@ use sqlx::types::chrono::{DateTime, Utc};
 use sea_query::{MysqlQueryBuilder, Query, Expr};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::auth_token::{AuthToken, TokenFields};
+use crate::schema::auth_token::{AuthToken, TokenSchema};
 
 enum TokenSelector {
     Role(u32),
@@ -13,7 +13,7 @@ enum TokenSelector {
 
 pub(crate) async fn select_token(pool: &Pool<MySql>, 
     id: &str
-) -> Result<TokenFields, Error>
+) -> Result<TokenSchema, Error>
 {
     let (sql, values) = Query::select()
         .columns([
@@ -30,7 +30,7 @@ pub(crate) async fn select_token(pool: &Pool<MySql>,
 
     let row = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            TokenFields {
+            TokenSchema {
                 id: row.get(0),
                 role_id: row.get(1),
                 user_id: row.get(2),
@@ -47,7 +47,7 @@ pub(crate) async fn select_token(pool: &Pool<MySql>,
 
 async fn select_multiple_token(pool: &Pool<MySql>, 
     selector: TokenSelector
-) -> Result<Vec<TokenFields>, Error>
+) -> Result<Vec<TokenSchema>, Error>
 {
     let mut stmt = Query::select()
         .columns([
@@ -73,7 +73,7 @@ async fn select_multiple_token(pool: &Pool<MySql>,
 
     let row = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            TokenFields {
+            TokenSchema {
                 id: row.get(0),
                 role_id: row.get(1),
                 user_id: row.get(2),
@@ -90,14 +90,14 @@ async fn select_multiple_token(pool: &Pool<MySql>,
 
 pub(crate) async fn select_multiple_token_by_role(pool: &Pool<MySql>,
     role_id: u32
-) -> Result<Vec<TokenFields>, Error>
+) -> Result<Vec<TokenSchema>, Error>
 {
     select_multiple_token(pool, TokenSelector::Role(role_id)).await
 }
 
 pub(crate) async fn select_multiple_token_by_user(pool: &Pool<MySql>,
     user_id: u32
-) -> Result<Vec<TokenFields>, Error>
+) -> Result<Vec<TokenSchema>, Error>
 {
     select_multiple_token(pool, TokenSelector::User(user_id)).await
 }

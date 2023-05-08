@@ -3,7 +3,7 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::auth_role::{AuthRole, AuthAccess, RoleFields, RoleJoin};
+use crate::schema::auth_role::{AuthRole, AuthAccess, RoleSchema, RoleJoin};
 
 enum RoleSelector {
     Id(u32),
@@ -12,7 +12,7 @@ enum RoleSelector {
 
 async fn select_role(pool: &Pool<MySql>, 
     selector: RoleSelector
-) -> Result<RoleFields, Error>
+) -> Result<RoleSchema, Error>
 {
     let mut stmt = Query::select()
         .columns([
@@ -69,7 +69,7 @@ async fn select_role(pool: &Pool<MySql>,
     let first_row = rows.iter().next();
 
     match first_row {
-        Some(value) => Ok(RoleFields {
+        Some(value) => Ok(RoleSchema {
                 id: value.id,
                 name: value.name.clone(),
                 secured: value.secured,
@@ -84,20 +84,20 @@ async fn select_role(pool: &Pool<MySql>,
 
 pub(crate) async fn select_role_by_id(pool: &Pool<MySql>, 
     id: u32
-) -> Result<RoleFields, Error> 
+) -> Result<RoleSchema, Error> 
 {
     select_role(pool, RoleSelector::Id(id)).await
 }
 
 pub(crate) async fn select_role_by_name(pool: &Pool<MySql>, 
     name: &str
-) -> Result<RoleFields, Error> 
+) -> Result<RoleSchema, Error> 
 {
     select_role(pool, RoleSelector::Name(name.to_owned())).await
 }
 
 pub(crate) async fn select_role_all(pool: &Pool<MySql>, 
-) -> Result<Vec<RoleFields>, Error> 
+) -> Result<Vec<RoleSchema>, Error> 
 {
     let (sql, values) = Query::select()
         .columns([
@@ -113,7 +113,7 @@ pub(crate) async fn select_role_all(pool: &Pool<MySql>,
 
     let rows = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            RoleFields {
+            RoleSchema {
                 id: row.get(0),
                 name: row.get(1),
                 secured: row.get(2),

@@ -5,10 +5,11 @@ use sqlx::Pool;
 use sqlx::mysql::{MySql, MySqlPoolOptions};
 use sqlx::types::chrono::{DateTime, Utc};
 
-use schema::api::{ApiKind, ApiFields, ProcedureFields};
-use schema::auth_role::RoleFields;
-use schema::auth_user::UserFields;
-use schema::auth_token::TokenFields;
+pub use schema::api::{ApiSchema, ProcedureSchema};
+use schema::api::ApiKind;
+pub use schema::auth_role::RoleSchema;
+pub use schema::auth_user::UserSchema;
+pub use schema::auth_token::TokenSchema;
 use operation::api;
 use operation::role;
 use operation::user;
@@ -83,21 +84,21 @@ impl Auth {
     }
 
     pub async fn read_resource(&self, id: u32)
-        -> Result<ApiFields, sqlx::Error>
+        -> Result<ApiSchema, sqlx::Error>
     {
         api::select_api_by_id(&self.pool, ApiKind::Resource, id)
         .await
     }
 
     pub async fn read_resource_by_name(&self, name: &str)
-        -> Result<ApiFields, sqlx::Error>
+        -> Result<ApiSchema, sqlx::Error>
     {
         api::select_api_by_name(&self.pool, ApiKind::Resource, name)
         .await
     }
 
     pub async fn list_resource(&self)
-        -> Result<Vec<ApiFields>, sqlx::Error>
+        -> Result<Vec<ApiSchema>, sqlx::Error>
     {
         api::select_multiple_api(&self.pool, ApiKind::Resource).await
     }
@@ -124,21 +125,21 @@ impl Auth {
     }
 
     pub async fn read_application(&self, id: u32)
-        -> Result<ApiFields, sqlx::Error>
+        -> Result<ApiSchema, sqlx::Error>
     {
         api::select_api_by_id(&self.pool, ApiKind::Application, id)
         .await
     }
 
     pub async fn read_application_by_name(&self, name: &str)
-        -> Result<ApiFields, sqlx::Error>
+        -> Result<ApiSchema, sqlx::Error>
     {
         api::select_api_by_name(&self.pool, ApiKind::Application, name)
         .await
     }
 
     pub async fn list_application(&self)
-        -> Result<Vec<ApiFields>, sqlx::Error>
+        -> Result<Vec<ApiSchema>, sqlx::Error>
     {
         api::select_multiple_api(&self.pool, ApiKind::Application)
         .await
@@ -166,21 +167,21 @@ impl Auth {
     }
 
     pub async fn read_procedure(&self, id: u32)
-        -> Result<ProcedureFields, sqlx::Error>
+        -> Result<ProcedureSchema, sqlx::Error>
     {
         api::select_procedure_by_id(&self.pool, id)
         .await
     }
 
     pub async fn list_procedure_by_api(&self, api_id: u32)
-        -> Result<Vec<ProcedureFields>, sqlx::Error>
+        -> Result<Vec<ProcedureSchema>, sqlx::Error>
     {
         api::select_multiple_procedure(&self.pool, api_id)
         .await
     }
 
     pub async fn read_procedure_by_name(&self, api_id: u32, service: &str, name: &str)
-        -> Result<ProcedureFields, sqlx::Error>
+        -> Result<ProcedureSchema, sqlx::Error>
     {
         api::select_procedure_by_name(&self.pool, api_id, service, name)
         .await
@@ -208,21 +209,21 @@ impl Auth {
     }
 
     pub async fn read_role(&self, id: u32)
-        -> Result<RoleFields, sqlx::Error>
+        -> Result<RoleSchema, sqlx::Error>
     {
         role::select_role_by_id(&self.pool, id)
         .await
     }
 
     pub async fn read_role_by_name(&self, name: &str)
-        -> Result<RoleFields, sqlx::Error>
+        -> Result<RoleSchema, sqlx::Error>
     {
         role::select_role_by_name(&self.pool, name)
         .await
     }
 
     pub async fn list_role(&self)
-        -> Result<Vec<RoleFields>, sqlx::Error>
+        -> Result<Vec<RoleSchema>, sqlx::Error>
     {
         role::select_role_all(&self.pool)
         .await
@@ -264,21 +265,21 @@ impl Auth {
     }
 
     pub async fn read_user(&self, id: u32)
-        -> Result<UserFields, sqlx::Error>
+        -> Result<UserSchema, sqlx::Error>
     {
         user::select_user_by_id(&self.pool, id)
         .await
     }
 
     pub async fn read_user_by_name(&self, name: &str)
-        -> Result<UserFields, sqlx::Error>
+        -> Result<UserSchema, sqlx::Error>
     {
         user::select_user_by_name(&self.pool, name)
         .await
     }
 
     pub async fn list_user_by_role(&self, role_id: u32)
-        -> Result<Vec<UserFields>, sqlx::Error>
+        -> Result<Vec<UserSchema>, sqlx::Error>
     {
         user::select_multiple_user_by_role(&self.pool, role_id)
         .await
@@ -306,21 +307,21 @@ impl Auth {
     }
 
     pub async fn read_token(&self, id: &str)
-        -> Result<TokenFields, sqlx::Error>
+        -> Result<TokenSchema, sqlx::Error>
     {
         token::select_token(&self.pool, id)
         .await
     }
 
     pub async fn list_token_by_role(&self, role_id: u32)
-        -> Result<Vec<TokenFields>, sqlx::Error>
+        -> Result<Vec<TokenSchema>, sqlx::Error>
     {
         token::select_multiple_token_by_role(&self.pool, role_id)
         .await
     }
 
     pub async fn list_token_by_user(&self, user_id: u32)
-        -> Result<Vec<TokenFields>, sqlx::Error>
+        -> Result<Vec<TokenSchema>, sqlx::Error>
     {
         token::select_multiple_token_by_user(&self.pool, user_id)
         .await

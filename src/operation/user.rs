@@ -3,7 +3,7 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::auth_user::{AuthUser, UserFields};
+use crate::schema::auth_user::{AuthUser, UserSchema};
 
 enum UserSelector {
     Role(u32),
@@ -13,7 +13,7 @@ enum UserSelector {
 
 async fn select_user(pool: &Pool<MySql>, 
     selector: UserSelector
-) -> Result<Vec<UserFields>, Error>
+) -> Result<Vec<UserSchema>, Error>
 {
     let mut stmt = Query::select()
         .columns([
@@ -44,7 +44,7 @@ async fn select_user(pool: &Pool<MySql>,
 
     let rows = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            UserFields {
+            UserSchema {
                 role_id: row.get(0),
                 id: row.get(1),
                 name: row.get(2),
@@ -63,7 +63,7 @@ async fn select_user(pool: &Pool<MySql>,
 
 pub(crate) async fn select_user_by_id(pool: &Pool<MySql>,
     id: u32
-) -> Result<UserFields, Error>
+) -> Result<UserSchema, Error>
 {
     let users = select_user(pool, UserSelector::User(id)).await;
     match users {
@@ -74,7 +74,7 @@ pub(crate) async fn select_user_by_id(pool: &Pool<MySql>,
 
 pub(crate) async fn select_user_by_name(pool: &Pool<MySql>,
     name: &str
-) -> Result<UserFields, Error>
+) -> Result<UserSchema, Error>
 {
     let users = select_user(pool, UserSelector::Name(name.to_owned())).await;
     match users {
@@ -85,7 +85,7 @@ pub(crate) async fn select_user_by_name(pool: &Pool<MySql>,
 
 pub(crate) async fn select_multiple_user_by_role(pool: &Pool<MySql>,
     role_id: u32
-) -> Result<Vec<UserFields>, Error>
+) -> Result<Vec<UserSchema>, Error>
 {
     select_user(pool, UserSelector::Role(role_id)).await
 }

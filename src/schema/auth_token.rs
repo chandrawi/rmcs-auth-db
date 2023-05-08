@@ -1,7 +1,6 @@
 use sea_query::Iden;
 use sqlx::types::chrono::{DateTime, Utc};
 
-#[allow(unused)]
 #[derive(Iden)]
 pub(crate) enum AuthToken {
     Table,
@@ -13,9 +12,8 @@ pub(crate) enum AuthToken {
     Ip
 }
 
-#[allow(unused)]
-#[derive(Debug, Default, PartialEq)]
-pub struct TokenFields {
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct TokenSchema {
     pub id: String,
     pub role_id: u32,
     pub user_id: u32,

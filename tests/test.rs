@@ -69,7 +69,7 @@ mod tests {
             ("NewAPI".to_owned(), "localhost".to_owned())
         );
         assert_eq!(
-            (procedure.api_id.unwrap(), procedure.service.clone(), procedure.procedure.clone()),
+            (procedure.api_id, procedure.service.clone(), procedure.procedure.clone()),
             (resource.id, "NewService".to_owned(), "NewProcedure".to_owned())
         );
 
@@ -82,8 +82,8 @@ mod tests {
         let procedure = auth.read_procedure_by_name(resource.id, &procedure.service.clone(), &procedure.procedure.clone()).await.unwrap();
         let resource_procedure = resource.procedures.into_iter().last().unwrap();
 
-        assert_eq!(resource.description.unwrap(), "New resource api".to_owned());
-        assert_eq!(procedure.description.unwrap(), "New procedure".to_owned());
+        assert_eq!(resource.description, "New resource api".to_owned());
+        assert_eq!(procedure.description, "New procedure".to_owned());
         assert_eq!(procedure.id, resource_procedure.id);
 
         // delete resource and procedure
