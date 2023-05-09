@@ -225,7 +225,7 @@ impl Auth {
     pub async fn list_role(&self)
         -> Result<Vec<RoleSchema>, sqlx::Error>
     {
-        role::select_role_all(&self.pool)
+        role::select_multiple_role(&self.pool)
         .await
     }
 

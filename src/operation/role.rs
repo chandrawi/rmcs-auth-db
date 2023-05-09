@@ -3,16 +3,17 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::auth_role::{AuthRole, AuthAccess, RoleSchema, RoleJoin};
+use crate::schema::auth_role::{AuthRole, AuthAccess, RoleSchema};
 
 enum RoleSelector {
     Id(u32),
-    Name(String)
+    Name(String),
+    All
 }
 
 async fn select_role(pool: &Pool<MySql>, 
     selector: RoleSelector
-) -> Result<RoleSchema, Error>
+) -> Result<Vec<RoleSchema>, Error>
 {
     let mut stmt = Query::select()
         .columns([
@@ -39,94 +40,67 @@ async fn select_role(pool: &Pool<MySql>,
         },
         RoleSelector::Name(value) => {
             stmt = stmt.and_where(Expr::col((AuthRole::Table, AuthRole::Role)).eq(value)).to_owned();
-        }
+        },
+        RoleSelector::All => {}
     }
     let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
 
-    let rows = sqlx::query_with(&sql, values)
+    let mut last_id: Option<u32> = None;
+    let mut role_schema_vec: Vec<RoleSchema> = Vec::new();
+
+    sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            RoleJoin {
-                id: row.get(0),
-                name: row.get(1),
-                secured: row.get(2),
-                multi: row.get(3),
-                token_expire: row.get(4),
-                token_limit: row.get(5),
-                procedure_id: row.try_get(6).ok(),
+            // get last role_schema in role_schema_vec or default
+            let mut role_schema = role_schema_vec.pop().unwrap_or_default();
+            // on every new role_id found update last_id and insert new role_schema to role_schema_vec
+            let role_id: u32 = row.get(0);
+            if let Some(value) = last_id {
+                if value != role_id {
+                    role_schema_vec.push(role_schema.clone());
+                    role_schema = RoleSchema::default();
+                }
             }
+            last_id = Some(role_id);
+            role_schema.id = role_id;
+            role_schema.name = row.get(1);
+            role_schema.secured = row.get(2);
+            role_schema.multi = row.get(3);
+            role_schema.token_expire = row.get(4);
+            role_schema.token_limit = row.get(5);
+            // on every new procedure_id found add a procedure to role_schema
+            let procedure_id = row.try_get(6);
+            if let Ok(id) = procedure_id {
+                role_schema.access.push(id);
+            }
+            // update role_schema_vec with updated role_schema
+            role_schema_vec.push(role_schema);
         })
         .fetch_all(pool)
         .await?;
 
-    let access: Vec<u32> = rows.iter()
-        .filter(|row| {
-            row.procedure_id != None 
-        })
-        .map(|row| {
-            row.procedure_id.unwrap_or_default()
-        })
-        .collect();
-    let first_row = rows.iter().next();
-
-    match first_row {
-        Some(value) => Ok(RoleSchema {
-                id: value.id,
-                name: value.name.clone(),
-                secured: value.secured,
-                multi: value.multi,
-                token_expire: value.token_expire,
-                token_limit: value.token_limit,
-                access,
-            }),
-        None => Err(Error::RowNotFound)
-    }
+    Ok(role_schema_vec)
 }
 
 pub(crate) async fn select_role_by_id(pool: &Pool<MySql>, 
     id: u32
 ) -> Result<RoleSchema, Error> 
 {
-    select_role(pool, RoleSelector::Id(id)).await
+    select_role(pool, RoleSelector::Id(id)).await?.into_iter().next()
+        .ok_or(Error::RowNotFound)
 }
 
 pub(crate) async fn select_role_by_name(pool: &Pool<MySql>, 
     name: &str
 ) -> Result<RoleSchema, Error> 
 {
-    select_role(pool, RoleSelector::Name(name.to_owned())).await
+    select_role(pool, RoleSelector::Name(name.to_owned())).await?.into_iter().next()
+        .ok_or(Error::RowNotFound)
 }
 
-pub(crate) async fn select_role_all(pool: &Pool<MySql>, 
+pub(crate) async fn select_multiple_role(pool: &Pool<MySql>, 
 ) -> Result<Vec<RoleSchema>, Error> 
 {
-    let (sql, values) = Query::select()
-        .columns([
-            AuthRole::RoleId,
-            AuthRole::Role,
-            AuthRole::Secured,
-            AuthRole::Multi,
-            AuthRole::TokenExpire,
-            AuthRole::TokenLimit
-        ])
-        .from(AuthRole::Table)
-        .build_sqlx(MysqlQueryBuilder);
-
-    let rows = sqlx::query_with(&sql, values)
-        .map(|row: MySqlRow| {
-            RoleSchema {
-                id: row.get(0),
-                name: row.get(1),
-                secured: row.get(2),
-                multi: row.get(3),
-                token_expire: row.get(4),
-                token_limit: row.get(5),
-                access: vec![],
-            }
-        })
-        .fetch_all(pool)
-        .await?;
-
-    Ok(rows)
+    select_role(pool, RoleSelector::All).await
 }
 
 pub(crate) async fn insert_role(pool: &Pool<MySql>, 

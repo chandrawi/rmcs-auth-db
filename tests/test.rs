@@ -64,14 +64,11 @@ mod tests {
         let procedures = auth.list_procedure_by_api(resource.id).await.unwrap();
         let procedure = procedures.into_iter().last().unwrap();
 
-        assert_eq!(
-            (resource.name.clone(), resource.address.clone()), 
-            ("NewAPI".to_owned(), "localhost".to_owned())
-        );
-        assert_eq!(
-            (procedure.api_id, procedure.service.clone(), procedure.procedure.clone()),
-            (resource.id, "NewService".to_owned(), "NewProcedure".to_owned())
-        );
+        assert_eq!(resource.name.clone(), "NewAPI");
+        assert_eq!(resource.address.clone(), "localhost");
+        assert_eq!(procedure.api_id, resource.id);
+        assert_eq!(procedure.service.clone(), "NewService");
+        assert_eq!(procedure.procedure.clone(), "NewProcedure");
 
         // update created procedure and resource API
         auth.update_procedure(procedure.id, None, None, Some("New procedure")).await.unwrap();
@@ -82,8 +79,8 @@ mod tests {
         let procedure = auth.read_procedure_by_name(resource.id, &procedure.service.clone(), &procedure.procedure.clone()).await.unwrap();
         let resource_procedure = resource.procedures.into_iter().last().unwrap();
 
-        assert_eq!(resource.description, "New resource api".to_owned());
-        assert_eq!(procedure.description, "New procedure".to_owned());
+        assert_eq!(resource.description, "New resource api");
+        assert_eq!(procedure.description, "New procedure");
         assert_eq!(procedure.id, resource_procedure.id);
 
         // delete resource and procedure
@@ -117,10 +114,10 @@ mod tests {
         let role = auth.read_role(role_id).await.unwrap();
 
         assert_eq!(last_role.id, role_id);
-        assert_eq!(
-            (role.name.clone(), role.secured, role.multi, role.access),
-            ("user".to_owned(), true, false, vec![proc_id])
-        );
+        assert_eq!(role.name.clone(), "user");
+        assert_eq!(role.secured, true);
+        assert_eq!(role.multi, false);
+        assert_eq!(role.access, [proc_id]);
 
         // get user data
         let users = auth.list_user_by_role(role_id).await.unwrap();
@@ -128,10 +125,8 @@ mod tests {
         let user = auth.read_user(user_id).await.unwrap();
 
         assert_eq!(last_user.id, user.id);
-        assert_eq!(
-            (user.name.clone(), user.password.clone()),
-            ("username".to_owned(), "secret".to_owned())
-        );
+        assert_eq!(user.name.clone(), "username");
+        assert_eq!(user.password.clone(), "secret");
 
         // get token data
         let role_tokens = auth.list_token_by_user(user_id).await.unwrap();
@@ -142,10 +137,10 @@ mod tests {
 
         assert_eq!(role_token.id, token_id);
         assert_eq!(user_token.id, token_id);
-        assert_eq!(
-            (token.role_id, token.user_id, token.limit, token.expire),
-            (role_id, user_id, 0, expire)
-        );
+        assert_eq!(token.role_id, role_id);
+        assert_eq!(token.user_id, user_id);
+        assert_eq!(token.limit, 0);
+        assert_eq!(token.expire, expire);
 
         // update role and user
         auth.update_role(role_id, None, None, Some(true), Some(43200), Some(10000)).await.unwrap();
@@ -155,14 +150,11 @@ mod tests {
         let role = auth.read_role_by_name(&role.name.clone()).await.unwrap();
         let user = auth.read_user_by_name(&user.name.clone()).await.unwrap();
 
-        assert_eq!(
-            (role.multi, role.token_expire, role.token_limit),
-            (true, 43200, 10000)
-        );
-        assert_eq!(
-            (user.email, user.phone),
-            ("user@domain.com".to_owned(), "+6280123456789".to_owned())
-        );
+        assert_eq!(role.multi, true);
+        assert_eq!(role.token_expire, 43200);
+        assert_eq!(role.token_limit, 10000);
+        assert_eq!(user.email.clone(), "user@domain.com");
+        assert_eq!(user.phone.clone(), "+6280123456789");
 
         // delete role, user, and token
         auth.delete_token(token_id).await.unwrap();
@@ -177,9 +169,6 @@ mod tests {
         assert!(try_token.is_err());
         assert!(try_user.is_err());
         assert!(try_role.is_err());
-
-        // drop tables after testing
-        sqlx::migrate!().undo(&auth.pool, 2).await.unwrap();
     }
 
 }

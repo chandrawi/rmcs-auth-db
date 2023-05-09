@@ -30,14 +30,3 @@ pub struct RoleSchema {
     pub token_limit: u32,
     pub access: Vec<u32>
 }
-
-#[derive(Debug, Default)]
-pub(crate) struct RoleJoin {
-    pub(crate) id: u32,
-    pub(crate) name: String,
-    pub(crate) secured: bool,
-    pub(crate) multi: bool,
-    pub(crate) token_expire: u32,
-    pub(crate) token_limit: u32,
-    pub(crate) procedure_id: Option<u32>
-}

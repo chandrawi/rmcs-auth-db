@@ -47,18 +47,6 @@ pub struct ApiSchema {
     pub procedures: Vec<ProcedureSchema>
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct ApiJoin {
-    pub(crate) id: u32,
-    pub(crate) name: String,
-    pub(crate) address: String,
-    pub(crate) description: String,
-    pub(crate) procedure_id: Option<u32>,
-    pub(crate) service: Option<String>,
-    pub(crate) procedure: Option<String>,
-    pub(crate) procedure_description: Option<String>
-}
-
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ProcedureSchema {
     pub id: u32,
