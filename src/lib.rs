@@ -15,19 +15,20 @@ use operation::role;
 use operation::user;
 use operation::token;
 
+#[derive(Debug, Clone)]
 pub struct Auth {
     pub pool: Pool<MySql>,
     options: AuthOptions
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AuthOptions {
     limit: u32,
     with_description: bool,
     order: Vec<OrderOption>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OrderOption {
     IdAsc,
     IdDesc,
