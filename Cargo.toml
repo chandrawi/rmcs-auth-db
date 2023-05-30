@@ -9,6 +9,7 @@ sea-query = "0.28.4"
 sea-query-binder = { version = "0.3.0", features = ["sqlx-mysql", "with-chrono"] }
 sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "mysql", "migrate"] }
 tokio = { version = "1.28.0", features = ["rt-multi-thread", "macros"] }
+rand = "0.8.5"
 
 [dev-dependencies]
 dotenvy = "0.15.7"

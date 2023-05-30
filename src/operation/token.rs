@@ -1,72 +1,42 @@
 use sqlx::{Pool, Row, Error};
 use sqlx::mysql::{MySql, MySqlRow};
 use sqlx::types::chrono::{DateTime, Utc};
-use sea_query::{MysqlQueryBuilder, Query, Expr};
+use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
+use rand::{thread_rng, Rng};
 
-use crate::schema::auth_token::{AuthToken, TokenSchema};
+use crate::schema::auth_token::{Token, TokenSchema};
 
 enum TokenSelector {
-    Role(u32),
+    Refresh(String),
+    Access(u32),
     User(u32)
 }
 
-pub(crate) async fn select_token(pool: &Pool<MySql>, 
-    id: &str
-) -> Result<TokenSchema, Error>
-{
-    let (sql, values) = Query::select()
-        .columns([
-            AuthToken::Id,
-            AuthToken::RoleId,
-            AuthToken::UserId,
-            AuthToken::Expire,
-            AuthToken::Limit,
-            AuthToken::Ip
-        ])
-        .from(AuthToken::Table)
-        .and_where(Expr::col(AuthToken::Id).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
-
-    let row = sqlx::query_with(&sql, values)
-        .map(|row: MySqlRow| {
-            TokenSchema {
-                id: row.get(0),
-                role_id: row.get(1),
-                user_id: row.get(2),
-                expire: row.get(3),
-                limit: row.get(4),
-                ip: row.get(5)
-            }
-        })
-        .fetch_one(pool)
-        .await?;
-
-    Ok(row)
-}
-
-async fn select_multiple_token(pool: &Pool<MySql>, 
+async fn select_token(pool: &Pool<MySql>, 
     selector: TokenSelector
 ) -> Result<Vec<TokenSchema>, Error>
 {
     let mut stmt = Query::select()
         .columns([
-            AuthToken::Id,
-            AuthToken::RoleId,
-            AuthToken::UserId,
-            AuthToken::Expire,
-            AuthToken::Limit,
-            AuthToken::Ip
+            Token::RefreshId,
+            Token::AccessId,
+            Token::UserId,
+            Token::Expire,
+            Token::Ip
         ])
-        .from(AuthToken::Table)
+        .from(Token::Table)
         .to_owned();
 
     match selector {
-        TokenSelector::Role(value) => {
-            stmt = stmt.and_where(Expr::col((AuthToken::Table, AuthToken::RoleId)).eq(value)).to_owned();
+        TokenSelector::Refresh(value) => {
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::RefreshId)).eq(value)).to_owned();
+        },
+        TokenSelector::Access(value) => {
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::AccessId)).eq(value)).to_owned();
         },
         TokenSelector::User(value) => {
-            stmt = stmt.and_where(Expr::col((AuthToken::Table, AuthToken::UserId)).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::UserId)).eq(value)).to_owned();
         }
     }
     let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
@@ -74,12 +44,11 @@ async fn select_multiple_token(pool: &Pool<MySql>,
     let row = sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
             TokenSchema {
-                id: row.get(0),
-                role_id: row.get(1),
+                refresh_id: row.get(0),
+                access_id: row.get(1),
                 user_id: row.get(2),
                 expire: row.get(3),
-                limit: row.get(4),
-                ip: row.get(5)
+                ip: row.get(4)
             }
         })
         .fetch_all(pool)
@@ -88,46 +57,65 @@ async fn select_multiple_token(pool: &Pool<MySql>,
     Ok(row)
 }
 
-pub(crate) async fn select_multiple_token_by_role(pool: &Pool<MySql>,
-    role_id: u32
-) -> Result<Vec<TokenSchema>, Error>
+pub(crate) async fn select_token_by_refresh(pool: &Pool<MySql>,
+    refresh_id: &str
+) -> Result<TokenSchema, Error>
 {
-    select_multiple_token(pool, TokenSelector::Role(role_id)).await
+    match select_token(pool, TokenSelector::Refresh(String::from(refresh_id))).await?.into_iter().next() {
+        Some(value) => Ok(value),
+        None => Err(Error::RowNotFound)
+    }
 }
 
-pub(crate) async fn select_multiple_token_by_user(pool: &Pool<MySql>,
+pub(crate) async fn select_token_by_access(pool: &Pool<MySql>,
+    access_id: u32
+) -> Result<Vec<TokenSchema>, Error>
+{
+    select_token(pool, TokenSelector::Access(access_id)).await
+}
+
+pub(crate) async fn select_token_by_user(pool: &Pool<MySql>,
     user_id: u32
 ) -> Result<Vec<TokenSchema>, Error>
 {
-    select_multiple_token(pool, TokenSelector::User(user_id)).await
+    select_token(pool, TokenSelector::User(user_id)).await
 }
 
 pub(crate) async fn insert_token(pool: &Pool<MySql>, 
-    id: &str, 
-    role_id: u32, 
     user_id: u32, 
-    expire: Option<DateTime<Utc>>, 
-    limit: Option<u32>,
-    ip: Option<Vec<u8>>
-) -> Result<(), Error> 
+    expire: DateTime<Utc>, 
+    ip: Option<&[u8]>
+) -> Result<(u32, String), Error> 
 {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
+    let refresh_id: String = (0..32).map(|_| CHARSET[thread_rng().gen_range(0..64)] as char).collect();
+
+    let sql = Query::select()
+        .expr(Func::max(Expr::col(Token::AccessId)))
+        .from(Token::Table)
+        .to_string(MysqlQueryBuilder);
+    let id: u32 = sqlx::query(&sql)
+        .map(|row: MySqlRow| row.get(0))
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+    let access_id = if id < u32::MAX { id + 1 } else { 1 };
+
     let (sql, values) = Query::insert()
-        .into_table(AuthToken::Table)
+        .into_table(Token::Table)
         .columns([
-            AuthToken::Id,
-            AuthToken::RoleId,
-            AuthToken::UserId,
-            AuthToken::Expire,
-            AuthToken::Limit,
-            AuthToken::Ip
+            Token::RefreshId,
+            Token::AccessId,
+            Token::UserId,
+            Token::Expire,
+            Token::Ip
         ])
         .values([
-            id.into(),
-            role_id.into(),
+            refresh_id.clone().into(),
+            access_id.into(),
             user_id.into(),
-            expire.unwrap_or_default().into(),
-            limit.unwrap_or_default().into(),
-            ip.unwrap_or_default().into()
+            expire.into(),
+            ip.unwrap_or_default().to_vec().into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);
@@ -136,21 +124,53 @@ pub(crate) async fn insert_token(pool: &Pool<MySql>,
         .execute(pool)
         .await?;
 
-    Ok(())
+    Ok((access_id, refresh_id))
 }
 
-pub(crate) async fn delete_token(pool: &Pool<MySql>, 
-    id: &str
+async fn delete_token(pool: &Pool<MySql>, 
+    selector: TokenSelector
 ) -> Result<(), Error> 
 {
-    let (sql, values) = Query::delete()
-        .from_table(AuthToken::Table)
-        .and_where(Expr::col(AuthToken::Id).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+    let mut stmt = Query::delete()
+        .from_table(Token::Table)
+        .to_owned();
+    match selector {
+        TokenSelector::Refresh(value) => {
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::RefreshId)).eq(value)).to_owned();
+        },
+        TokenSelector::Access(value) => {
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::AccessId)).eq(value)).to_owned();
+        },
+        TokenSelector::User(value) => {
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::UserId)).eq(value)).to_owned();
+        }
+    }
+    let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
         .await?;
 
     Ok(())
+}
+
+pub(crate) async fn delete_token_by_refresh(pool: &Pool<MySql>,
+    refresh_id: &str,
+) -> Result<(), Error>
+{
+    delete_token(pool, TokenSelector::Refresh(String::from(refresh_id))).await
+}
+
+pub(crate) async fn delete_token_by_access(pool: &Pool<MySql>,
+    access_id: u32
+) -> Result<(), Error>
+{
+    delete_token(pool, TokenSelector::Access(access_id)).await
+}
+
+pub(crate) async fn delete_token_by_user(pool: &Pool<MySql>,
+    user_id: u32
+) -> Result<(), Error>
+{
+    delete_token(pool, TokenSelector::User(user_id)).await
 }

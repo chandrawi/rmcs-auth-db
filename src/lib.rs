@@ -6,7 +6,6 @@ use sqlx::mysql::{MySql, MySqlPoolOptions};
 use sqlx::types::chrono::{DateTime, Utc};
 
 pub use schema::api::{ApiSchema, ProcedureSchema};
-use schema::api::ApiKind;
 pub use schema::auth_role::RoleSchema;
 pub use schema::auth_user::UserSchema;
 pub use schema::auth_token::TokenSchema;
@@ -272,38 +271,52 @@ impl Auth {
         .await
     }
 
-    pub async fn read_token(&self, id: &str)
+    pub async fn read_refresh_token(&self, refresh_id: &str)
         -> Result<TokenSchema, sqlx::Error>
     {
-        token::select_token(&self.pool, id)
+        token::select_token_by_refresh(&self.pool, refresh_id)
         .await
     }
 
-    pub async fn list_token_by_role(&self, role_id: u32)
+    pub async fn list_access_token(&self, access_id: u32)
         -> Result<Vec<TokenSchema>, sqlx::Error>
     {
-        token::select_multiple_token_by_role(&self.pool, role_id)
+        token::select_token_by_access(&self.pool, access_id)
         .await
     }
 
-    pub async fn list_token_by_user(&self, user_id: u32)
+    pub async fn list_user_token(&self, user_id: u32)
         -> Result<Vec<TokenSchema>, sqlx::Error>
     {
-        token::select_multiple_token_by_user(&self.pool, user_id)
+        token::select_token_by_user(&self.pool, user_id)
         .await
     }
 
-    pub async fn create_token(&self, id: &str, role_id: u32, user_id: u32, expire: Option<DateTime<Utc>>, limit: Option<u32>, ip: Option<Vec<u8>>)
-        -> Result<(), sqlx::Error>
+    pub async fn create_token(&self, user_id: u32, expire: DateTime<Utc>, ip: Option<&[u8]>)
+        -> Result<(u32, String), sqlx::Error>
     {
-        token::insert_token(&self.pool, id, role_id, user_id, expire, limit, ip)
+        token::insert_token(&self.pool, user_id, expire, ip)
         .await
     }
 
-    pub async fn delete_token(&self, id: &str)
+    pub async fn delete_refresh_token(&self, refresh_id: &str)
         -> Result<(), sqlx::Error>
     {
-        token::delete_token(&self.pool, id)
+        token::delete_token_by_refresh(&self.pool, refresh_id)
+        .await
+    }
+
+    pub async fn delete_access_token(&self, access_id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        token::delete_token_by_access(&self.pool, access_id)
+        .await
+    }
+
+    pub async fn delete_user_token(&self, user_id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        token::delete_token_by_user(&self.pool, user_id)
         .await
     }
 
