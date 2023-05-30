@@ -251,10 +251,10 @@ impl Auth {
         .await
     }
 
-    pub async fn create_user(&self, role_id: u32, name: &str, password: &str, public_key: &str, private_key: &str, email: Option<&str>, phone: Option<&str>)
+    pub async fn create_user(&self, name: &str, password: &str, public_key: &str, private_key: &str, email: Option<&str>, phone: Option<&str>)
         -> Result<u32, sqlx::Error>
     {
-        user::insert_user(&self.pool, role_id, name, password, public_key, private_key, email, phone)
+        user::insert_user(&self.pool, name, password, public_key, private_key, email, phone)
         .await
     }
 

@@ -3,12 +3,13 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::auth_user::{AuthUser, UserSchema};
+use crate::schema::auth_user::{User, UserRole, UserSchema, UserRoleSchema};
+use crate::schema::auth_role::Role;
 
 enum UserSelector {
-    Role(u32),
-    User(u32),
-    Name(String)
+    Id(u32),
+    Name(String),
+    Role(u32)
 }
 
 async fn select_user(pool: &Pool<MySql>, 
@@ -17,55 +18,93 @@ async fn select_user(pool: &Pool<MySql>,
 {
     let mut stmt = Query::select()
         .columns([
-            AuthUser::RoleId,
-            AuthUser::UserId,
-            AuthUser::User,
-            AuthUser::Password,
-            AuthUser::PublicKey,
-            AuthUser::PrivateKey,
-            AuthUser::Email,
-            AuthUser::Phone
+            (User::Table, User::UserId),
+            (User::Table, User::Name),
+            (User::Table, User::Password),
+            (User::Table, User::PublicKey),
+            (User::Table, User::PrivateKey),
+            (User::Table, User::Email),
+            (User::Table, User::Phone)
         ])
-        .from(AuthUser::Table)
+        .columns([
+            (Role::Table, Role::Name),
+            (Role::Table, Role::Multi),
+            (Role::Table, Role::IpLock),
+            (Role::Table, Role::AccessDuration),
+            (Role::Table, Role::RefreshDuration)
+        ])
+        .from(User::Table)
+        .left_join(UserRole::Table,
+            Expr::col((User::Table, User::UserId))
+            .equals((UserRole::Table, UserRole::UserId))
+        )
+        .left_join(Role::Table,
+            Expr::col((UserRole::Table, UserRole::RoleId))
+            .equals((Role::Table, Role::RoleId))
+        )
         .to_owned();
 
     match selector {
-        UserSelector::Role(value) => {
-            stmt = stmt.and_where(Expr::col(AuthUser::RoleId).eq(value)).to_owned();
-        },
-        UserSelector::User(value) => {
-            stmt = stmt.and_where(Expr::col(AuthUser::UserId).eq(value)).to_owned();
+        UserSelector::Id(value) => {
+            stmt = stmt.and_where(Expr::col(User::UserId).eq(value)).to_owned();
         },
         UserSelector::Name(value) => {
-            stmt = stmt.and_where(Expr::col(AuthUser::User).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col(User::Name).eq(value)).to_owned();
+        }
+        UserSelector::Role(value) => {
+            stmt = stmt.and_where(Expr::col(Role::RoleId).eq(value)).to_owned();
         }
     }
     let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
 
-    let rows = sqlx::query_with(&sql, values)
+    let mut last_id: Option<u32> = None;
+    let mut user_schema_vec: Vec<UserSchema> = Vec::new();
+
+    sqlx::query_with(&sql, values)
         .map(|row: MySqlRow| {
-            UserSchema {
-                role_id: row.get(0),
-                id: row.get(1),
-                name: row.get(2),
-                password: row.get(3),
-                public_key: row.get(4),
-                private_key: row.get(5),
-                email: row.get(6),
-                phone: row.get(7)
+            // get last user_schema in user_schema_vec or default
+            let mut user_schema = user_schema_vec.pop().unwrap_or_default();
+            // on every new user_id found update last_id and insert new user_schema to user_schema_vec
+            let user_id: u32 = row.get(0);
+            if let Some(value) = last_id {
+                if value != user_id {
+                    user_schema_vec.push(user_schema.clone());
+                    user_schema = UserSchema::default();
+                }
             }
+            last_id = Some(user_id);
+            user_schema.id = user_id;
+            user_schema.name = row.get(1);
+            user_schema.password = row.get(2);
+            user_schema.public_key = row.get(3);
+            user_schema.private_key = row.get(4);
+            user_schema.email = row.get(5);
+            user_schema.phone = row.get(6);
+            // on every new role_id found add a role to user_schema
+            let role_name = row.try_get(7).ok();
+            if let Some(name) = role_name {
+                user_schema.roles.push(UserRoleSchema {
+                    role: name,
+                    multi: row.get(8),
+                    ip_lock: row.get(9),
+                    access_duration: row.get(10),
+                    refresh_duration: row.get(11)
+                });
+            }
+            // update api_schema_vec with updated user_schema
+            user_schema_vec.push(user_schema);
         })
         .fetch_all(pool)
         .await?;
 
-    Ok(rows)
+    Ok(user_schema_vec)
 }
 
 pub(crate) async fn select_user_by_id(pool: &Pool<MySql>,
     id: u32
 ) -> Result<UserSchema, Error>
 {
-    let users = select_user(pool, UserSelector::User(id)).await;
+    let users = select_user(pool, UserSelector::Id(id)).await;
     match users {
         Ok(value) => value.into_iter().next().ok_or(Error::RowNotFound),
         Err(e) => Err(e)
@@ -91,7 +130,6 @@ pub(crate) async fn select_multiple_user_by_role(pool: &Pool<MySql>,
 }
 
 pub(crate) async fn insert_user(pool: &Pool<MySql>, 
-    role_id: u32, 
     name: &str, 
     password: &str, 
     public_key: &str, 
@@ -101,18 +139,16 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
 ) -> Result<u32, Error> 
 {
     let (sql, values) = Query::insert()
-        .into_table(AuthUser::Table)
+        .into_table(User::Table)
         .columns([
-            AuthUser::RoleId,
-            AuthUser::User,
-            AuthUser::Password,
-            AuthUser::PublicKey,
-            AuthUser::PrivateKey,
-            AuthUser::Email,
-            AuthUser::Phone
+            User::Name,
+            User::Password,
+            User::PublicKey,
+            User::PrivateKey,
+            User::Email,
+            User::Phone
         ])
         .values([
-            role_id.into(),
             name.into(),
             password.into(),
             public_key.into(),
@@ -128,8 +164,8 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
         .await?;
 
     let sql = Query::select()
-        .expr(Func::max(Expr::col(AuthUser::UserId)))
-        .from(AuthUser::Table)
+        .expr(Func::max(Expr::col(User::UserId)))
+        .from(User::Table)
         .to_string(MysqlQueryBuilder);
     let id: u32 = sqlx::query(&sql)
         .map(|row: MySqlRow| row.get(0))
@@ -150,30 +186,30 @@ pub(crate) async fn update_user(pool: &Pool<MySql>,
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
-        .table(AuthUser::Table)
+        .table(User::Table)
         .to_owned();
 
     if let Some(value) = name {
-        stmt = stmt.value(AuthUser::User, value).to_owned();
+        stmt = stmt.value(User::Name, value).to_owned();
     }
     if let Some(value) = password {
-        stmt = stmt.value(AuthUser::Password, value).to_owned();
+        stmt = stmt.value(User::Password, value).to_owned();
     }
     if let Some(value) = public_key {
-        stmt = stmt.value(AuthUser::PublicKey, value).to_owned();
+        stmt = stmt.value(User::PublicKey, value).to_owned();
     }
     if let Some(value) = private_key {
-        stmt = stmt.value(AuthUser::PrivateKey, value).to_owned();
+        stmt = stmt.value(User::PrivateKey, value).to_owned();
     }
     if let Some(value) = email {
-        stmt = stmt.value(AuthUser::Email, value).to_owned();
+        stmt = stmt.value(User::Email, value).to_owned();
     }
     if let Some(value) = phone {
-        stmt = stmt.value(AuthUser::Phone, value).to_owned();
+        stmt = stmt.value(User::Phone, value).to_owned();
     }
 
     let (sql, values) = stmt
-        .and_where(Expr::col(AuthUser::RoleId).eq(id))
+        .and_where(Expr::col(User::UserId).eq(id))
         .build_sqlx(MysqlQueryBuilder);
 
     sqlx::query_with(&sql, values)
@@ -188,8 +224,8 @@ pub(crate) async fn delete_user(pool: &Pool<MySql>,
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
-        .from_table(AuthUser::Table)
-        .and_where(Expr::col(AuthUser::UserId).eq(id))
+        .from_table(User::Table)
+        .and_where(Expr::col(User::UserId).eq(id))
         .build_sqlx(MysqlQueryBuilder);
 
     sqlx::query_with(&sql, values)
