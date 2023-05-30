@@ -84,86 +84,44 @@ impl Auth {
         self.options.order = order;
     }
 
-    pub async fn read_resource(&self, id: u32)
+    pub async fn read_api(&self, id: u32)
         -> Result<ApiSchema, sqlx::Error>
     {
-        api::select_api_by_id(&self.pool, ApiKind::Resource, id)
+        api::select_api_by_id(&self.pool, id)
         .await
     }
 
-    pub async fn read_resource_by_name(&self, name: &str)
+    pub async fn read_api_by_name(&self, name: &str)
         -> Result<ApiSchema, sqlx::Error>
     {
-        api::select_api_by_name(&self.pool, ApiKind::Resource, name)
+        api::select_api_by_name(&self.pool, name)
         .await
     }
 
-    pub async fn list_resource(&self)
+    pub async fn list_api_by_category(&self, category: &str)
         -> Result<Vec<ApiSchema>, sqlx::Error>
     {
-        api::select_multiple_api(&self.pool, ApiKind::Resource).await
+        api::select_api_by_category(&self.pool, category).await
     }
 
-    pub async fn create_resource(&self, name: &str, address: &str, description: Option<&str>)
+    pub async fn create_api(&self, name: &str, address: &str, category: &str, description: Option<&str>)
         -> Result<u32, sqlx::Error>
     {
-        api::insert_api(&self.pool, ApiKind::Resource, name, address, description)
+        api::insert_api(&self.pool, name, address, category, description)
         .await
     }
 
-    pub async fn update_resource(&self, id: u32, name: Option<&str>, address: Option<&str>, description: Option<&str>)
+    pub async fn update_api(&self, id: u32, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>)
         -> Result<(), sqlx::Error>
     {
-        api::update_api(&self.pool, ApiKind::Resource, id, name, address, description)
+        api::update_api(&self.pool, id, name, address, category, description)
         .await
     }
 
-    pub async fn delete_resource(&self, id: u32)
+    pub async fn delete_api(&self, id: u32)
         -> Result<(), sqlx::Error>
     {
-        api::delete_api(&self.pool, ApiKind::Resource, id)
-        .await
-    }
-
-    pub async fn read_application(&self, id: u32)
-        -> Result<ApiSchema, sqlx::Error>
-    {
-        api::select_api_by_id(&self.pool, ApiKind::Application, id)
-        .await
-    }
-
-    pub async fn read_application_by_name(&self, name: &str)
-        -> Result<ApiSchema, sqlx::Error>
-    {
-        api::select_api_by_name(&self.pool, ApiKind::Application, name)
-        .await
-    }
-
-    pub async fn list_application(&self)
-        -> Result<Vec<ApiSchema>, sqlx::Error>
-    {
-        api::select_multiple_api(&self.pool, ApiKind::Application)
-        .await
-    }
-
-    pub async fn create_application(&self, name: &str, address: &str, description: Option<&str>)
-        -> Result<u32, sqlx::Error>
-    {
-        api::insert_api(&self.pool, ApiKind::Application, name, address, description)
-        .await
-    }
-
-    pub async fn update_application(&self, id: u32, name: Option<&str>, address: Option<&str>, description: Option<&str>)
-        -> Result<(), sqlx::Error>
-    {
-        api::update_api(&self.pool, ApiKind::Application, id, name, address, description)
-        .await
-    }
-
-    pub async fn delete_application(&self, id: u32)
-        -> Result<(), sqlx::Error>
-    {
-        api::delete_api(&self.pool, ApiKind::Application, id)
+        api::delete_api(&self.pool, id)
         .await
     }
 
@@ -174,13 +132,6 @@ impl Auth {
         .await
     }
 
-    pub async fn list_procedure_by_api(&self, api_id: u32)
-        -> Result<Vec<ProcedureSchema>, sqlx::Error>
-    {
-        api::select_multiple_procedure(&self.pool, api_id)
-        .await
-    }
-
     pub async fn read_procedure_by_name(&self, api_id: u32, service: &str, name: &str)
         -> Result<ProcedureSchema, sqlx::Error>
     {
@@ -188,17 +139,24 @@ impl Auth {
         .await
     }
 
-    pub async fn create_procedure(&self, api_id: u32, service: &str, name: &str, description: Option<&str>)
-        -> Result<u32, sqlx::Error>
+    pub async fn list_procedure_by_api(&self, api_id: u32)
+        -> Result<Vec<ProcedureSchema>, sqlx::Error>
     {
-        api::insert_procedure(&self.pool, api_id, service, name, description)
+        api::select_procedure_by_api(&self.pool, api_id)
         .await
     }
 
-    pub async fn update_procedure(&self, id: u32, service: Option<&str>, name: Option<&str>, description: Option<&str>)
+    pub async fn create_procedure(&self, api_id: u32, name: &str, description: Option<&str>)
+        -> Result<u32, sqlx::Error>
+    {
+        api::insert_procedure(&self.pool, api_id, name, description)
+        .await
+    }
+
+    pub async fn update_procedure(&self, id: u32, name: Option<&str>, description: Option<&str>)
         -> Result<(), sqlx::Error>
     {
-        api::update_procedure(&self.pool, id, service, name, description)
+        api::update_procedure(&self.pool, id, name, description)
         .await
     }
 

@@ -15,7 +15,7 @@ pub(crate) enum AuthRole {
 
 #[allow(unused)]
 #[derive(Iden)]
-pub(crate) enum AuthAccess {
+pub(crate) enum RoleAccess {
     Table,
     RoleId,
     ProcedureId
