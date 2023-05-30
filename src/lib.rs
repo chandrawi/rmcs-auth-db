@@ -174,31 +174,38 @@ impl Auth {
         .await
     }
 
-    pub async fn read_role_by_name(&self, name: &str)
+    pub async fn read_role_by_name(&self, api_id: u32, name: &str)
         -> Result<RoleSchema, sqlx::Error>
     {
-        role::select_role_by_name(&self.pool, name)
+        role::select_role_by_name(&self.pool, api_id, name)
         .await
     }
 
-    pub async fn list_role(&self)
+    pub async fn list_role_by_api(&self, api_id: u32)
         -> Result<Vec<RoleSchema>, sqlx::Error>
     {
-        role::select_multiple_role(&self.pool)
+        role::select_role_by_api(&self.pool, api_id)
         .await
     }
 
-    pub async fn create_role(&self, name: &str, secured: bool, multi: bool, token_expire: Option<u32>, token_limit: Option<u32>)
+    pub async fn list_role_by_user(&self, user_id: u32)
+        -> Result<Vec<RoleSchema>, sqlx::Error>
+    {
+        role::select_role_by_user(&self.pool, user_id)
+        .await
+    }
+
+    pub async fn create_role(&self, api_id: u32, name: &str, access_key: &str, multi: bool, ip_lock: bool, access_duration: Option<u32>, refresh_duration: Option<u32>)
         -> Result<u32, sqlx::Error>
     {
-        role::insert_role(&self.pool, name, secured, multi, token_expire, token_limit)
+        role::insert_role(&self.pool, api_id, name, access_key, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 
-    pub async fn update_role(&self, id: u32, name: Option<&str>, secured: Option<bool>, multi: Option<bool>, token_expire: Option<u32>, token_limit: Option<u32>)
+    pub async fn update_role(&self, id: u32, name: Option<&str>, access_key: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<u32>, refresh_duration: Option<u32>)
         -> Result<(), sqlx::Error>
     {
-        role::update_role(&self.pool, id, name, secured, multi, token_expire, token_limit)
+        role::update_role(&self.pool, id, name, access_key, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 
