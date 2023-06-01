@@ -2,11 +2,11 @@ CREATE TABLE `role` (
   `role_id` smallint(5) UNSIGNED NOT NULL,
   `api_id` smallint(5) UNSIGNED NOT NULL,
   `name` varchar(64) NOT NULL,
-  `access_key` varchar(64) NOT NULL,
   `multi` tinyint(1) NOT NULL DEFAULT 1,
   `ip_lock` tinyint(1) NOT NULL DEFAULT 0,
   `access_duration` int(10) UNSIGNED NOT NULL DEFAULT 0,
-  `refresh_duration` int(10) UNSIGNED NOT NULL DEFAULT 0
+  `refresh_duration` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `access_key` varbinary(64) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `role_access` (

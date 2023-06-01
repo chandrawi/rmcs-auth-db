@@ -1,11 +1,11 @@
 CREATE TABLE `user` (
   `user_id` int(10) UNSIGNED NOT NULL,
   `name` varchar(64) NOT NULL,
-  `password` varchar(128) NOT NULL,
-  `public_key` varchar(4096) NOT NULL,
-  `private_key` varchar(4096) NOT NULL,
   `email` varchar(64) NOT NULL,
-  `phone` varchar(32) NOT NULL
+  `phone` varchar(32) NOT NULL,
+  `password` varchar(128) NOT NULL,
+  `public_key` varbinary(4096) NOT NULL,
+  `private_key` varbinary(4096) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `user_role` (

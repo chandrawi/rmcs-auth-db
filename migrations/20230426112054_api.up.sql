@@ -3,10 +3,10 @@ CREATE TABLE `api` (
   `name` varchar(64) NOT NULL,
   `address` varchar(128) NOT NULL,
   `category` varchar(64) NOT NULL,
+  `description` varchar(255) NOT NULL,
   `password` varchar(128) NOT NULL,
-  `public_key` varchar(4096) NOT NULL,
-  `private_key` varchar(4096) NOT NULL,
-  `description` varchar(255) NOT NULL
+  `public_key` varbinary(4096) NOT NULL,
+  `private_key` varbinary(4096) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `api_procedure` (

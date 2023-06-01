@@ -1,5 +1,6 @@
 pub mod schema;
 pub(crate) mod operation;
+pub(crate) mod crypto;
 
 use sqlx::Pool;
 use sqlx::mysql::{MySql, MySqlPoolOptions};
