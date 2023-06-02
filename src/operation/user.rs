@@ -5,6 +5,7 @@ use sea_query_binder::SqlxBinder;
 
 use crate::schema::auth_user::{User, UserRole, UserSchema, UserRoleSchema};
 use crate::schema::auth_role::Role;
+use crate::crypto;
 
 enum UserSelector {
     Id(u32),
@@ -46,13 +47,13 @@ async fn select_user(pool: &Pool<MySql>,
 
     match selector {
         UserSelector::Id(value) => {
-            stmt = stmt.and_where(Expr::col(User::UserId).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col((User::Table, User::UserId)).eq(value)).to_owned();
         },
         UserSelector::Name(value) => {
-            stmt = stmt.and_where(Expr::col(User::Name).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col((User::Table, User::Name)).eq(value)).to_owned();
         }
         UserSelector::Role(value) => {
-            stmt = stmt.and_where(Expr::col(Role::RoleId).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(value)).to_owned();
         }
     }
     let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
@@ -122,7 +123,7 @@ pub(crate) async fn select_user_by_name(pool: &Pool<MySql>,
     }
 }
 
-pub(crate) async fn select_multiple_user_by_role(pool: &Pool<MySql>,
+pub(crate) async fn select_user_by_role(pool: &Pool<MySql>,
     role_id: u32
 ) -> Result<Vec<UserSchema>, Error>
 {
@@ -131,13 +132,17 @@ pub(crate) async fn select_multiple_user_by_role(pool: &Pool<MySql>,
 
 pub(crate) async fn insert_user(pool: &Pool<MySql>, 
     name: &str, 
-    password: &str, 
-    public_key: &str, 
-    private_key: &str,
-    email: Option<&str>,
-    phone: Option<&str>
+    email: &str,
+    phone: &str,
+    password: &str
 ) -> Result<u32, Error> 
 {
+    let password_hash = crypto::hash_password(&password).or(Err(Error::WorkerCrashed))?;
+
+    let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
+    let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+    let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+
     let (sql, values) = Query::insert()
         .into_table(User::Table)
         .columns([
@@ -150,11 +155,11 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
         ])
         .values([
             name.into(),
-            password.into(),
-            public_key.into(),
-            private_key.into(),
-            email.unwrap_or_default().into(),
-            phone.unwrap_or_default().into()
+            password_hash.into(),
+            pub_der.into(),
+            priv_der.into(),
+            email.into(),
+            phone.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);
@@ -178,11 +183,10 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
 pub(crate) async fn update_user(pool: &Pool<MySql>, 
     id: u32, 
     name: Option<&str>, 
-    password: Option<&str>, 
-    public_key: Option<&str>, 
-    private_key: Option<&str>,
     email: Option<&str>,
-    phone: Option<&str>
+    phone: Option<&str>,
+    password: Option<&str>, 
+    keys: Option<()>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -192,20 +196,24 @@ pub(crate) async fn update_user(pool: &Pool<MySql>,
     if let Some(value) = name {
         stmt = stmt.value(User::Name, value).to_owned();
     }
-    if let Some(value) = password {
-        stmt = stmt.value(User::Password, value).to_owned();
-    }
-    if let Some(value) = public_key {
-        stmt = stmt.value(User::PublicKey, value).to_owned();
-    }
-    if let Some(value) = private_key {
-        stmt = stmt.value(User::PrivateKey, value).to_owned();
-    }
     if let Some(value) = email {
         stmt = stmt.value(User::Email, value).to_owned();
     }
     if let Some(value) = phone {
         stmt = stmt.value(User::Phone, value).to_owned();
+    }
+    if let Some(value) = password {
+        let password_hash = crypto::hash_password(value).or(Err(Error::WorkerCrashed))?;
+        stmt = stmt.value(User::Password, password_hash).to_owned();
+    }
+    if let Some(_) = keys {
+        let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
+        let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+        let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+        stmt = stmt
+            .value(User::PublicKey, pub_der)
+            .value(User::PrivateKey, priv_der)
+            .to_owned();
     }
 
     let (sql, values) = stmt
@@ -226,6 +234,49 @@ pub(crate) async fn delete_user(pool: &Pool<MySql>,
     let (sql, values) = Query::delete()
         .from_table(User::Table)
         .and_where(Expr::col(User::UserId).eq(id))
+        .build_sqlx(MysqlQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub(crate) async fn add_user_role(pool: &Pool<MySql>, 
+    id: u32,
+    role_id: u32
+) -> Result<(), Error> 
+{
+    let (sql, values) = Query::insert()
+        .into_table(UserRole::Table)
+        .columns([
+            UserRole::UserId,
+            UserRole::RoleId
+        ])
+        .values([
+            id.into(),
+            role_id.into()
+        ])
+        .unwrap_or(&mut sea_query::InsertStatement::default())
+        .build_sqlx(MysqlQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub(crate) async fn remove_user_role(pool: &Pool<MySql>, 
+    id: u32,
+    role_id: u32
+) -> Result<(), Error> 
+{
+    let (sql, values) = Query::delete()
+        .from_table(UserRole::Table)
+        .and_where(Expr::col(UserRole::UserId).eq(id))
+        .and_where(Expr::col(UserRole::RoleId).eq(role_id))
         .build_sqlx(MysqlQueryBuilder);
 
     sqlx::query_with(&sql, values)

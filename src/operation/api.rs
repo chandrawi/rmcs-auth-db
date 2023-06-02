@@ -3,8 +3,9 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Order, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema, RoleKeySchema};
+use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema, AccessKeySchema};
 use crate::schema::auth_role::{Role, RoleAccess};
+use crate::crypto;
 
 enum ApiSelector {
     Id(u32),
@@ -28,7 +29,10 @@ async fn select_api(pool: &Pool<MySql>,
             (Api::Table, Api::Name),
             (Api::Table, Api::Address),
             (Api::Table, Api::Category),
-            (Api::Table, Api::Description)
+            (Api::Table, Api::Description),
+            (Api::Table, Api::Password),
+            (Api::Table, Api::PublicKey),
+            (Api::Table, Api::PrivateKey)
         ])
         .columns([
             (ApiProcedure::Table, ApiProcedure::ProcedureId),
@@ -95,32 +99,35 @@ async fn select_api(pool: &Pool<MySql>,
             api_schema.address = row.get(2);
             api_schema.category = row.get(3);
             api_schema.description = row.get(4);
+            api_schema.password = Some(row.get(5));
+            api_schema.public_key = row.get(6);
+            api_schema.private_key = Some(row.get(7));
             // on every new procedure_id found add a procedure to api_schema
-            let procedure_id = row.try_get(5).ok();
-            let procedure_name: String = row.try_get(6).unwrap_or_default();
+            let procedure_id = row.try_get(8).ok();
+            let procedure_name: String = row.try_get(9).unwrap_or_default();
             if last_procedure == None || last_procedure != procedure_id {
                 if let Some(id) = procedure_id {
                     api_schema.procedures.push(ProcedureSchema {
                         id,
                         api_id,
                         name: procedure_name.clone(),
-                        description: row.get(7),
+                        description: row.get(10),
                         roles: Vec::new()
                     });
                 }
             }
             last_procedure = procedure_id;
             // add role to api_schema procedures
-            let role_name: Result<String, _> = row.try_get(8);
+            let role_name: Result<String, _> = row.try_get(11);
             if let Ok(name) = role_name {
                 let mut procedure_schema = api_schema.procedures.pop().unwrap_or_default();
                 procedure_schema.roles.push(name.clone());
                 api_schema.procedures.push(procedure_schema);
                 // add role key schema to api_schema
                 if let None = role_vec.iter().find(|&e| e == &name) {
-                    api_schema.keys.push(RoleKeySchema {
+                    api_schema.access_keys.push(AccessKeySchema {
                         role: name.clone(),
-                        access_key: row.get(9)
+                        access_key: row.get(12)
                     });
                 }
                 role_vec.push(name);
@@ -161,22 +168,35 @@ pub(crate) async fn insert_api(pool: &Pool<MySql>,
     name: &str, 
     address: &str, 
     category: &str, 
-    description: Option<&str>
+    description: &str,
+    password: &str
 ) -> Result<u32, Error> 
 {
+    let password_hash = crypto::hash_password(&password).or(Err(Error::WorkerCrashed))?;
+
+    let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
+    let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+    let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+
     let (sql, values) = Query::insert()
         .into_table(Api::Table)
         .columns([
             Api::Name,
             Api::Address,
             Api::Category,
+            Api::Password,
+            Api::PublicKey,
+            Api::PrivateKey,
             Api::Description
         ])
         .values([
             name.into(),
             address.into(),
             category.into(),
-            description.unwrap_or_default().into()
+            password_hash.into(),
+            pub_der.into(),
+            priv_der.into(),
+            description.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);
@@ -202,7 +222,9 @@ pub(crate) async fn update_api(pool: &Pool<MySql>,
     name: Option<&str>, 
     address: Option<&str>, 
     category: Option<&str>, 
-    description: Option<&str>
+    description: Option<&str>,
+    password: Option<&str>,
+    keys: Option<()>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -218,8 +240,21 @@ pub(crate) async fn update_api(pool: &Pool<MySql>,
     if let Some(value) = category {
         stmt = stmt.value(Api::Category, value).to_owned();
     }
+    if let Some(value) = password {
+        let password_hash = crypto::hash_password(value).or(Err(Error::WorkerCrashed))?;
+        stmt = stmt.value(Api::Password, password_hash).to_owned();
+    }
     if let Some(value) = description {
         stmt = stmt.value(Api::Description, value).to_owned();
+    }
+    if let Some(_) = keys {
+        let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
+        let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+        let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+        stmt = stmt
+            .value(Api::PublicKey, pub_der)
+            .value(Api::PrivateKey, priv_der)
+            .to_owned();
     }
 
     let (sql, values) = stmt
@@ -336,7 +371,6 @@ pub(crate) async fn select_procedure_by_id(pool: &Pool<MySql>,
 
 pub(crate) async fn select_procedure_by_name(pool: &Pool<MySql>, 
     api_id: u32,
-    _service: &str,
     name: &str
 ) -> Result<ProcedureSchema, Error> 
 {
@@ -354,7 +388,7 @@ pub(crate) async fn select_procedure_by_api(pool: &Pool<MySql>,
 pub(crate) async fn insert_procedure(pool: &Pool<MySql>, 
     api_id: u32,
     name: &str,
-    description: Option<&str>
+    description: &str
 ) -> Result<u32, Error> 
 {
     let (sql, values) = Query::insert()
@@ -367,7 +401,7 @@ pub(crate) async fn insert_procedure(pool: &Pool<MySql>,
         .values([
             api_id.into(),
             name.into(),
-            description.unwrap_or_default().into()
+            description.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);

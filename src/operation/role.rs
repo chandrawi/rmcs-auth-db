@@ -5,6 +5,7 @@ use sea_query_binder::SqlxBinder;
 
 use crate::schema::auth_role::{Role, RoleAccess, RoleSchema};
 use crate::schema::auth_user::UserRole;
+use crate::crypto;
 
 enum RoleSelector {
     Id(u32),
@@ -138,32 +139,33 @@ pub(crate) async fn select_role_by_user(pool: &Pool<MySql>,
 pub(crate) async fn insert_role(pool: &Pool<MySql>, 
     api_id: u32,
     name: &str, 
-    access_key: &str,
     multi: bool, 
     ip_lock: bool, 
-    access_duration: Option<u32>,
-    refresh_duration: Option<u32>,
+    access_duration: u32,
+    refresh_duration: u32,
 ) -> Result<u32, Error> 
 {
+    let access_key = crypto::generate_random_bytes(32);
+
     let (sql, values) = Query::insert()
         .into_table(Role::Table)
         .columns([
             Role::ApiId,
             Role::Name,
-            Role::AccessKey,
             Role::Multi,
             Role::IpLock,
             Role::AccessDuration,
-            Role::RefreshDuration
+            Role::RefreshDuration,
+            Role::AccessKey
         ])
         .values([
             api_id.into(),
             name.into(),
-            access_key.into(),
             multi.into(),
             ip_lock.into(),
-            access_duration.unwrap_or_default().into(),
-            refresh_duration.unwrap_or_default().into()
+            access_duration.into(),
+            refresh_duration.into(),
+            access_key.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);
@@ -187,11 +189,11 @@ pub(crate) async fn insert_role(pool: &Pool<MySql>,
 pub(crate) async fn update_role(pool: &Pool<MySql>, 
     id: u32, 
     name: Option<&str>, 
-    access_key: Option<&str>,
     multi: Option<bool>, 
     ip_lock: Option<bool>, 
     access_duration: Option<u32>,
     refresh_duration: Option<u32>,
+    keys: Option<()>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -200,9 +202,6 @@ pub(crate) async fn update_role(pool: &Pool<MySql>,
 
     if let Some(value) = name {
         stmt = stmt.value(Role::Name, value).to_owned();
-    }
-    if let Some(value) = access_key {
-        stmt = stmt.value(Role::AccessKey, value).to_owned();
     }
     if let Some(value) = multi {
         stmt = stmt.value(Role::Multi, value).to_owned();
@@ -215,6 +214,10 @@ pub(crate) async fn update_role(pool: &Pool<MySql>,
     }
     if let Some(value) = refresh_duration {
         stmt = stmt.value(Role::RefreshDuration, value).to_owned();
+    }
+    if let Some(_) = keys {
+        let access_key = crypto::generate_random_bytes(32);
+        stmt = stmt.value(Role::AccessKey, access_key).to_owned();
     }
 
     let (sql, values) = stmt

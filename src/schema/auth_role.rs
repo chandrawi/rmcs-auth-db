@@ -5,14 +5,14 @@ use rmcs_auth_api::role;
 #[derive(Iden)]
 pub(crate) enum Role {
     Table,
-    ApiId,
     RoleId,
+    ApiId,
     Name,
-    AccessKey,
     Multi,
     IpLock,
     AccessDuration,
-    RefreshDuration
+    RefreshDuration,
+    AccessKey
 }
 
 #[allow(unused)]
@@ -28,11 +28,11 @@ pub struct RoleSchema {
     pub id: u32,
     pub api_id: u32,
     pub name: String,
-    pub access_key: String,
     pub multi: bool,
     pub ip_lock: bool,
     pub access_duration: u32,
     pub refresh_duration: u32,
+    pub access_key: Vec<u8>,
     pub procedures: Vec<u32>
 }
 
@@ -42,11 +42,11 @@ impl From<role::RoleSchema> for RoleSchema {
             id: value.id,
             api_id: value.api_id,
             name: value.name,
-            access_key: value.access_key,
             multi: value.multi,
             ip_lock: value.ip_lock,
-            refresh_duration: value.refresh_duration,
             access_duration: value.access_duration,
+            refresh_duration: value.refresh_duration,
+            access_key: value.access_key,
             procedures: value.procedures
         }
     }
@@ -58,11 +58,11 @@ impl Into<role::RoleSchema> for RoleSchema {
             id: self.id,
             api_id: self.api_id,
             name: self.name,
-            access_key: self.access_key,
             multi: self.multi,
             ip_lock: self.ip_lock,
-            refresh_duration: self.refresh_duration,
             access_duration: self.access_duration,
+            refresh_duration: self.refresh_duration,
+            access_key: self.access_key,
             procedures: self.procedures
         }
     }

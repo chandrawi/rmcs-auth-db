@@ -24,11 +24,11 @@ pub(crate) enum UserRole {
 pub struct UserSchema {
     pub id: u32,
     pub name: String,
-    pub password: String,
-    pub public_key: String,
-    pub private_key: String,
     pub email: String,
     pub phone: String,
+    pub public_key: Vec<u8>,
+    pub private_key: Option<Vec<u8>>,
+    pub password: Option<String>,
     pub roles: Vec<UserRoleSchema>
 }
 
@@ -46,11 +46,11 @@ impl From<user::UserSchema> for UserSchema {
         Self {
             id: value.id,
             name: value.name,
-            password: value.password,
-            public_key: value.public_key,
-            private_key: value.private_key,
             email: value.email,
             phone: value.phone,
+            public_key: value.public_key,
+            private_key: None,
+            password: value.password,
             roles: value.roles.into_iter().map(|e| e.into()).collect()
         }
     }
@@ -61,11 +61,10 @@ impl Into<user::UserSchema> for UserSchema {
         user::UserSchema {
             id: self.id,
             name: self.name,
-            password: self.password,
-            public_key: self.public_key,
-            private_key: self.private_key,
             email: self.email,
             phone: self.phone,
+            public_key: self.public_key,
+            password: self.password,
             roles: self.roles.into_iter().map(|e| e.into()).collect()
         }
     }

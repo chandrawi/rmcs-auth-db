@@ -3,9 +3,9 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sqlx::types::chrono::{DateTime, Utc};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
-use rand::{thread_rng, Rng};
 
 use crate::schema::auth_token::{Token, TokenSchema};
+use crate::crypto;
 
 enum TokenSelector {
     Refresh(String),
@@ -30,13 +30,13 @@ async fn select_token(pool: &Pool<MySql>,
 
     match selector {
         TokenSelector::Refresh(value) => {
-            stmt = stmt.and_where(Expr::col((Token::Table, Token::RefreshId)).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col(Token::RefreshId).eq(value)).to_owned();
         },
         TokenSelector::Access(value) => {
-            stmt = stmt.and_where(Expr::col((Token::Table, Token::AccessId)).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col(Token::AccessId).eq(value)).to_owned();
         },
         TokenSelector::User(value) => {
-            stmt = stmt.and_where(Expr::col((Token::Table, Token::UserId)).eq(value)).to_owned();
+            stmt = stmt.and_where(Expr::col(Token::UserId).eq(value)).to_owned();
         }
     }
     let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
@@ -82,24 +82,29 @@ pub(crate) async fn select_token_by_user(pool: &Pool<MySql>,
 }
 
 pub(crate) async fn insert_token(pool: &Pool<MySql>, 
+    access_id: Option<u32>,
     user_id: u32, 
     expire: DateTime<Utc>, 
-    ip: Option<&[u8]>
+    ip: &[u8]
 ) -> Result<(u32, String), Error> 
 {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
-    let refresh_id: String = (0..32).map(|_| CHARSET[thread_rng().gen_range(0..64)] as char).collect();
+    let refresh_id = crypto::generate_random_base64(32);
 
-    let sql = Query::select()
-        .expr(Func::max(Expr::col(Token::AccessId)))
-        .from(Token::Table)
-        .to_string(MysqlQueryBuilder);
-    let id: u32 = sqlx::query(&sql)
-        .map(|row: MySqlRow| row.get(0))
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
-    let access_id = if id < u32::MAX { id + 1 } else { 1 };
+    let access_id = if let Some(value) = access_id {
+        value
+    } else {
+        let sql = Query::select()
+            .expr(Func::max(Expr::col(Token::AccessId)))
+            .from(Token::Table)
+            .to_string(MysqlQueryBuilder);
+        let id: u32 = sqlx::query(&sql)
+            .map(|row: MySqlRow| row.try_get(0))
+            .fetch_one(pool)
+            .await
+            .unwrap_or(Ok(0))
+            .unwrap_or(0);
+        if id < u32::MAX { id + 1 } else { 1 }
+    };
 
     let (sql, values) = Query::insert()
         .into_table(Token::Table)
@@ -115,7 +120,7 @@ pub(crate) async fn insert_token(pool: &Pool<MySql>,
             access_id.into(),
             user_id.into(),
             expire.into(),
-            ip.unwrap_or_default().to_vec().into()
+            ip.to_vec().into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);

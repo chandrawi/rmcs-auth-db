@@ -32,8 +32,11 @@ pub struct ApiSchema {
     pub address: String,
     pub category: String,
     pub description: String,
+    pub public_key: Vec<u8>,
+    pub private_key: Option<Vec<u8>>,
+    pub password: Option<String>,
     pub procedures: Vec<ProcedureSchema>,
-    pub keys: Vec<RoleKeySchema>
+    pub access_keys: Vec<AccessKeySchema>
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -46,9 +49,9 @@ pub struct ProcedureSchema {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct RoleKeySchema {
+pub struct AccessKeySchema {
     pub role: String,
-    pub access_key: String
+    pub access_key: Vec<u8>
 }
 
 impl From<api::ApiSchema> for ApiSchema {
@@ -59,8 +62,11 @@ impl From<api::ApiSchema> for ApiSchema {
             address: value.address,
             category: value.category,
             description: value.description,
+            public_key: value.public_key,
+            private_key: None,
+            password: value.password,
             procedures: value.procedures.into_iter().map(|e| e.into()).collect(),
-            keys: value.keys.into_iter().map(|e| e.into()).collect()
+            access_keys: value.access_keys.into_iter().map(|e| e.into()).collect()
         }
     }
 }
@@ -73,8 +79,10 @@ impl Into<api::ApiSchema> for ApiSchema {
             address: self.address,
             category: self.category,
             description: self.description,
+            public_key: self.public_key,
+            password: self.password,
             procedures: self.procedures.into_iter().map(|e| e.into()).collect(),
-            keys: self.keys.into_iter().map(|e| e.into()).collect()
+            access_keys: self.access_keys.into_iter().map(|e| e.into()).collect()
         }
     }
 }
@@ -103,8 +111,8 @@ impl Into<api::ProcedureSchema> for ProcedureSchema {
     }
 }
 
-impl From<api::RoleKeySchema> for RoleKeySchema {
-    fn from(value: api::RoleKeySchema) -> Self {
+impl From<api::AccessKeySchema> for AccessKeySchema {
+    fn from(value: api::AccessKeySchema) -> Self {
         Self {
             role: value.role,
             access_key: value.access_key,
@@ -112,9 +120,9 @@ impl From<api::RoleKeySchema> for RoleKeySchema {
     }
 }
 
-impl Into<api::RoleKeySchema> for RoleKeySchema {
-    fn into(self) -> api::RoleKeySchema {
-        api::RoleKeySchema {
+impl Into<api::AccessKeySchema> for AccessKeySchema {
+    fn into(self) -> api::AccessKeySchema {
+        api::AccessKeySchema {
             role: self.role,
             access_key: self.access_key,
         }

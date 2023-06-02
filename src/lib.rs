@@ -104,17 +104,17 @@ impl Auth {
         api::select_api_by_category(&self.pool, category).await
     }
 
-    pub async fn create_api(&self, name: &str, address: &str, category: &str, description: Option<&str>)
+    pub async fn create_api(&self, name: &str, address: &str, category: &str, description: &str, password: &str)
         -> Result<u32, sqlx::Error>
     {
-        api::insert_api(&self.pool, name, address, category, description)
+        api::insert_api(&self.pool, name, address, category, description, password)
         .await
     }
 
-    pub async fn update_api(&self, id: u32, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>)
+    pub async fn update_api(&self, id: u32, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>, password: Option<&str>, keys: Option<()>)
         -> Result<(), sqlx::Error>
     {
-        api::update_api(&self.pool, id, name, address, category, description)
+        api::update_api(&self.pool, id, name, address, category, description, password, keys)
         .await
     }
 
@@ -132,10 +132,10 @@ impl Auth {
         .await
     }
 
-    pub async fn read_procedure_by_name(&self, api_id: u32, service: &str, name: &str)
+    pub async fn read_procedure_by_name(&self, api_id: u32, name: &str)
         -> Result<ProcedureSchema, sqlx::Error>
     {
-        api::select_procedure_by_name(&self.pool, api_id, service, name)
+        api::select_procedure_by_name(&self.pool, api_id, name)
         .await
     }
 
@@ -146,7 +146,7 @@ impl Auth {
         .await
     }
 
-    pub async fn create_procedure(&self, api_id: u32, name: &str, description: Option<&str>)
+    pub async fn create_procedure(&self, api_id: u32, name: &str, description: &str)
         -> Result<u32, sqlx::Error>
     {
         api::insert_procedure(&self.pool, api_id, name, description)
@@ -195,17 +195,17 @@ impl Auth {
         .await
     }
 
-    pub async fn create_role(&self, api_id: u32, name: &str, access_key: &str, multi: bool, ip_lock: bool, access_duration: Option<u32>, refresh_duration: Option<u32>)
+    pub async fn create_role(&self, api_id: u32, name: &str, multi: bool, ip_lock: bool, access_duration: u32, refresh_duration: u32)
         -> Result<u32, sqlx::Error>
     {
-        role::insert_role(&self.pool, api_id, name, access_key, multi, ip_lock, access_duration, refresh_duration)
+        role::insert_role(&self.pool, api_id, name, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 
-    pub async fn update_role(&self, id: u32, name: Option<&str>, access_key: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<u32>, refresh_duration: Option<u32>)
+    pub async fn update_role(&self, id: u32, name: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<u32>, refresh_duration: Option<u32>, keys: Option<()>)
         -> Result<(), sqlx::Error>
     {
-        role::update_role(&self.pool, id, name, access_key, multi, ip_lock, access_duration, refresh_duration)
+        role::update_role(&self.pool, id, name, multi, ip_lock, access_duration, refresh_duration, keys)
         .await
     }
 
@@ -247,21 +247,21 @@ impl Auth {
     pub async fn list_user_by_role(&self, role_id: u32)
         -> Result<Vec<UserSchema>, sqlx::Error>
     {
-        user::select_multiple_user_by_role(&self.pool, role_id)
+        user::select_user_by_role(&self.pool, role_id)
         .await
     }
 
-    pub async fn create_user(&self, name: &str, password: &str, public_key: &str, private_key: &str, email: Option<&str>, phone: Option<&str>)
+    pub async fn create_user(&self, name: &str, email: &str, phone: &str, password: &str)
         -> Result<u32, sqlx::Error>
     {
-        user::insert_user(&self.pool, name, password, public_key, private_key, email, phone)
+        user::insert_user(&self.pool, name, email, phone, password)
         .await
     }
 
-    pub async fn update_user(&self, id: u32, name: Option<&str>, password: Option<&str>, public_key: Option<&str>, private_key: Option<&str>, email: Option<&str>, phone: Option<&str>)
+    pub async fn update_user(&self, id: u32, name: Option<&str>, email: Option<&str>, phone: Option<&str>, password: Option<&str>, keys: Option<()>)
         -> Result<(), sqlx::Error>
     {
-        user::update_user(&self.pool, id, name, password, public_key, private_key, email, phone)
+        user::update_user(&self.pool, id, name, email, phone, password, keys)
         .await
     }
 
@@ -269,6 +269,20 @@ impl Auth {
         -> Result<(), sqlx::Error>
     {
         user::delete_user(&self.pool, id)
+        .await
+    }
+
+    pub async fn add_user_role(&self, id: u32, role_id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        user::add_user_role(&self.pool, id, role_id)
+        .await
+    }
+
+    pub async fn remove_user_role(&self, id: u32, role_id: u32)
+        -> Result<(), sqlx::Error>
+    {
+        user::remove_user_role(&self.pool, id, role_id)
         .await
     }
 
@@ -286,17 +300,24 @@ impl Auth {
         .await
     }
 
-    pub async fn list_user_token(&self, user_id: u32)
+    pub async fn list_token_by_user(&self, user_id: u32)
         -> Result<Vec<TokenSchema>, sqlx::Error>
     {
         token::select_token_by_user(&self.pool, user_id)
         .await
     }
 
-    pub async fn create_token(&self, user_id: u32, expire: DateTime<Utc>, ip: Option<&[u8]>)
+    pub async fn create_refresh_token(&self, access_id: u32, user_id: u32, expire: DateTime<Utc>, ip: &[u8])
         -> Result<(u32, String), sqlx::Error>
     {
-        token::insert_token(&self.pool, user_id, expire, ip)
+        token::insert_token(&self.pool, Some(access_id), user_id, expire, ip)
+        .await
+    }
+
+    pub async fn create_access_token(&self, user_id: u32, expire: DateTime<Utc>, ip: &[u8])
+        -> Result<(u32, String), sqlx::Error>
+    {
+        token::insert_token(&self.pool, None, user_id, expire, ip)
         .await
     }
 
@@ -314,7 +335,7 @@ impl Auth {
         .await
     }
 
-    pub async fn delete_user_token(&self, user_id: u32)
+    pub async fn delete_token_by_user(&self, user_id: u32)
         -> Result<(), sqlx::Error>
     {
         token::delete_token_by_user(&self.pool, user_id)
