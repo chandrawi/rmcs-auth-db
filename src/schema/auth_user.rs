@@ -27,18 +27,20 @@ pub struct UserSchema {
     pub email: String,
     pub phone: String,
     pub public_key: Vec<u8>,
-    pub private_key: Option<Vec<u8>>,
-    pub password: Option<String>,
+    pub private_key: Vec<u8>,
+    pub password: String,
     pub roles: Vec<UserRoleSchema>
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct UserRoleSchema {
+    pub api_id: u32,
     pub role: String,
     pub multi: bool,
     pub ip_lock: bool,
     pub access_duration: u32,
-    pub refresh_duration: u32
+    pub refresh_duration: u32,
+    pub access_key: Vec<u8>
 }
 
 impl From<user::UserSchema> for UserSchema {
@@ -49,7 +51,7 @@ impl From<user::UserSchema> for UserSchema {
             email: value.email,
             phone: value.phone,
             public_key: value.public_key,
-            private_key: None,
+            private_key: Vec::new(),
             password: value.password,
             roles: value.roles.into_iter().map(|e| e.into()).collect()
         }
@@ -73,11 +75,13 @@ impl Into<user::UserSchema> for UserSchema {
 impl From<user::UserRoleSchema> for UserRoleSchema {
     fn from(value: user::UserRoleSchema) -> Self {
         Self {
+            api_id: value.api_id,
             role: value.role,
             multi: value.multi,
             ip_lock: value.ip_lock,
             access_duration: value.access_duration,
-            refresh_duration: value.refresh_duration
+            refresh_duration: value.refresh_duration,
+            access_key: value.access_key
         }
     }
 }
@@ -85,11 +89,13 @@ impl From<user::UserRoleSchema> for UserRoleSchema {
 impl Into<user::UserRoleSchema> for UserRoleSchema {
     fn into(self) -> user::UserRoleSchema {
         user::UserRoleSchema {
+            api_id: self.api_id,
             role: self.role,
             multi: self.multi,
             ip_lock: self.ip_lock,
             access_duration: self.access_duration,
-            refresh_duration: self.refresh_duration
+            refresh_duration: self.refresh_duration,
+            access_key: self.access_key
         }
     }
 }

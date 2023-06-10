@@ -6,7 +6,8 @@ CREATE TABLE `api` (
   `description` varchar(255) NOT NULL,
   `password` varchar(128) NOT NULL,
   `public_key` varbinary(4096) NOT NULL,
-  `private_key` varbinary(4096) NOT NULL
+  `private_key` varbinary(4096) NOT NULL,
+  `access_key` varbinary(64) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `api_procedure` (

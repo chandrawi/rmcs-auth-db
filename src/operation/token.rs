@@ -5,7 +5,7 @@ use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
 use crate::schema::auth_token::{Token, TokenSchema};
-use crate::crypto;
+use crate::utility;
 
 enum TokenSelector {
     Refresh(String),
@@ -88,7 +88,7 @@ pub(crate) async fn insert_token(pool: &Pool<MySql>,
     ip: &[u8]
 ) -> Result<(u32, String), Error> 
 {
-    let refresh_id = crypto::generate_random_base64(32);
+    let refresh_id = utility::generate_random_base64(32);
 
     let access_id = if let Some(value) = access_id {
         value

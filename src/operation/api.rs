@@ -3,9 +3,9 @@ use sqlx::mysql::{MySql, MySqlRow};
 use sea_query::{MysqlQueryBuilder, Query, Expr, Order, Func};
 use sea_query_binder::SqlxBinder;
 
-use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema, AccessKeySchema};
+use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema};
 use crate::schema::auth_role::{Role, RoleAccess};
-use crate::crypto;
+use crate::utility;
 
 enum ApiSelector {
     Id(u32),
@@ -32,7 +32,8 @@ async fn select_api(pool: &Pool<MySql>,
             (Api::Table, Api::Description),
             (Api::Table, Api::Password),
             (Api::Table, Api::PublicKey),
-            (Api::Table, Api::PrivateKey)
+            (Api::Table, Api::PrivateKey),
+            (Api::Table, Api::AccessKey)
         ])
         .columns([
             (ApiProcedure::Table, ApiProcedure::ProcedureId),
@@ -40,8 +41,7 @@ async fn select_api(pool: &Pool<MySql>,
             (ApiProcedure::Table, ApiProcedure::Description)
         ])
         .columns([
-            (Role::Table, Role::Name),
-            (Role::Table, Role::AccessKey)
+            (Role::Table, Role::Name)
         ])
         .from(Api::Table)
         .left_join(ApiProcedure::Table, 
@@ -99,37 +99,31 @@ async fn select_api(pool: &Pool<MySql>,
             api_schema.address = row.get(2);
             api_schema.category = row.get(3);
             api_schema.description = row.get(4);
-            api_schema.password = Some(row.get(5));
+            api_schema.password = row.get(5);
             api_schema.public_key = row.get(6);
-            api_schema.private_key = Some(row.get(7));
+            api_schema.private_key = row.get(7);
+            api_schema.access_key = row.get(8);
             // on every new procedure_id found add a procedure to api_schema
-            let procedure_id = row.try_get(8).ok();
-            let procedure_name: String = row.try_get(9).unwrap_or_default();
+            let procedure_id = row.try_get(9).ok();
+            let procedure_name: String = row.try_get(10).unwrap_or_default();
             if last_procedure == None || last_procedure != procedure_id {
                 if let Some(id) = procedure_id {
                     api_schema.procedures.push(ProcedureSchema {
                         id,
                         api_id,
                         name: procedure_name.clone(),
-                        description: row.get(10),
+                        description: row.get(11),
                         roles: Vec::new()
                     });
                 }
             }
             last_procedure = procedure_id;
             // add role to api_schema procedures
-            let role_name: Result<String, _> = row.try_get(11);
+            let role_name: Result<String, _> = row.try_get(12);
             if let Ok(name) = role_name {
                 let mut procedure_schema = api_schema.procedures.pop().unwrap_or_default();
                 procedure_schema.roles.push(name.clone());
                 api_schema.procedures.push(procedure_schema);
-                // add role key schema to api_schema
-                if let None = role_vec.iter().find(|&e| e == &name) {
-                    api_schema.access_keys.push(AccessKeySchema {
-                        role: name.clone(),
-                        access_key: row.get(12)
-                    });
-                }
                 role_vec.push(name);
             }
             // update api_schema_vec with updated api_schema
@@ -172,11 +166,13 @@ pub(crate) async fn insert_api(pool: &Pool<MySql>,
     password: &str
 ) -> Result<u32, Error> 
 {
-    let password_hash = crypto::hash_password(&password).or(Err(Error::WorkerCrashed))?;
+    let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
-    let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
-    let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-    let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+    let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
+    let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+    let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+
+    let access_key = utility::generate_random_bytes(32);
 
     let (sql, values) = Query::insert()
         .into_table(Api::Table)
@@ -184,19 +180,21 @@ pub(crate) async fn insert_api(pool: &Pool<MySql>,
             Api::Name,
             Api::Address,
             Api::Category,
+            Api::Description,
             Api::Password,
             Api::PublicKey,
             Api::PrivateKey,
-            Api::Description
+            Api::AccessKey
         ])
         .values([
             name.into(),
             address.into(),
             category.into(),
+            description.into(),
             password_hash.into(),
             pub_der.into(),
             priv_der.into(),
-            description.into()
+            access_key.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);
@@ -241,19 +239,21 @@ pub(crate) async fn update_api(pool: &Pool<MySql>,
         stmt = stmt.value(Api::Category, value).to_owned();
     }
     if let Some(value) = password {
-        let password_hash = crypto::hash_password(value).or(Err(Error::WorkerCrashed))?;
+        let password_hash = utility::hash_password(value).or(Err(Error::WorkerCrashed))?;
         stmt = stmt.value(Api::Password, password_hash).to_owned();
     }
     if let Some(value) = description {
         stmt = stmt.value(Api::Description, value).to_owned();
     }
     if let Some(_) = keys {
-        let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
-        let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-        let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+        let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
+        let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+        let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+        let access_key = utility::generate_random_bytes(32);
         stmt = stmt
             .value(Api::PublicKey, pub_der)
             .value(Api::PrivateKey, priv_der)
+            .value(Api::AccessKey, access_key)
             .to_owned();
     }
 

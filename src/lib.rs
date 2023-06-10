@@ -1,6 +1,6 @@
 pub mod schema;
 pub(crate) mod operation;
-pub(crate) mod crypto;
+pub(crate) mod utility;
 
 use sqlx::Pool;
 use sqlx::mysql::{MySql, MySqlPoolOptions};
@@ -202,10 +202,10 @@ impl Auth {
         .await
     }
 
-    pub async fn update_role(&self, id: u32, name: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<u32>, refresh_duration: Option<u32>, keys: Option<()>)
+    pub async fn update_role(&self, id: u32, name: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<u32>, refresh_duration: Option<u32>)
         -> Result<(), sqlx::Error>
     {
-        role::update_role(&self.pool, id, name, multi, ip_lock, access_duration, refresh_duration, keys)
+        role::update_role(&self.pool, id, name, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 

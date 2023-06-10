@@ -59,7 +59,7 @@ mod tests {
         }
 
         // create new resource API
-        let password_api = "Ap1_Pas5w0rd";
+        let password_api = "Ap1_P4s5w0rd";
         let api_id1 = auth.create_api("Resource1", "localhost:9001", "RESOURCE", "", password_api).await.unwrap();
         let api_id2 = auth.create_api("Resource_2", "localhost:9002", "RESOURCE", "",  password_api).await.unwrap();
 
@@ -84,10 +84,10 @@ mod tests {
         assert_eq!(procedure.api_id, api.id);
         assert_eq!(procedure.name, "ReadResourceData");
 
-        let (pub_key, priv_key) = (api.public_key, api.private_key.unwrap());
+        let (pub_key, priv_key) = (api.public_key, api.private_key);
         assert!(pub_key.len() > 64);
         assert!(priv_key.len() > 64);
-        let hash = api.password.unwrap();
+        let hash = api.password;
         let parsed_hash = PasswordHash::new(hash.as_str()).unwrap();
         assert!(Argon2::default().verify_password(password_api.as_bytes(), &parsed_hash).is_ok());
 
@@ -121,14 +121,13 @@ mod tests {
         let role_name = "admin";
         auth.update_api(api_id1, Some(api_name), None, None, Some("New resource api"), None, Some(())).await.unwrap();
         auth.update_procedure(proc_id1, Some(proc_name), Some("Read resource data")).await.unwrap();
-        auth.update_role(role_id1, Some(role_name), None, Some(true), None, None, Some(())).await.unwrap();
+        auth.update_role(role_id1, Some(role_name), None, Some(true), None, None).await.unwrap();
 
         // get updated resource API schema
         let api = auth.read_api_by_name(api_name).await.unwrap();
         let procedure = auth.read_procedure_by_name(api_id1, proc_name).await.unwrap();
         let role = auth.read_role_by_name(api_id1, role_name).await.unwrap();
         let api_procedure = api.procedures.into_iter().next().unwrap();
-        let api_role = api.access_keys.into_iter().filter(|e| e.role == role_name).next();
 
         assert_eq!(api.name, api_name);
         assert_eq!(api.description, "New resource api");
@@ -137,10 +136,9 @@ mod tests {
         assert_eq!(procedure.id, api_procedure.id);
         assert_eq!(role.name, role_name);
         assert_eq!(role.ip_lock, true);
-        assert!(api_role.is_some());
 
         assert_ne!(api.public_key, pub_key);
-        assert_ne!(api.private_key.unwrap(), priv_key);
+        assert_ne!(api.private_key, priv_key);
         assert_ne!(role.access_key, access_key);
 
         // create new user and add associated roles
@@ -163,10 +161,10 @@ mod tests {
         assert_eq!(user.email, "admin@mail.co");
         assert_eq!(user.phone, "+6281234567890");
 
-        let (pub_key, priv_key) = (user.public_key, user.private_key.unwrap());
+        let (pub_key, priv_key) = (user.public_key, user.private_key);
         assert!(pub_key.len() > 64);
         assert!(priv_key.len() > 64);
-        let hash = user.password.unwrap();
+        let hash = user.password;
         let parsed_hash = PasswordHash::new(hash.as_str()).unwrap();
         assert!(Argon2::default().verify_password(password_admin.as_bytes(), &parsed_hash).is_ok());
 
@@ -177,9 +175,9 @@ mod tests {
         // get updated user
         let user = auth.read_user_by_name("username").await.unwrap();
 
-        assert_ne!(user.password.unwrap(), hash);
+        assert_ne!(user.password, hash);
         assert_ne!(user.public_key, pub_key);
-        assert_ne!(user.private_key.unwrap(), priv_key);
+        assert_ne!(user.private_key, priv_key);
 
         // create new access token and refresh token
         let expire1 = DateTime::from_str("2023-01-01T00:00:00Z").unwrap();

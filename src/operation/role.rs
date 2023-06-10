@@ -4,8 +4,8 @@ use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
 use sea_query_binder::SqlxBinder;
 
 use crate::schema::auth_role::{Role, RoleAccess, RoleSchema};
+use crate::schema::api::Api;
 use crate::schema::auth_user::UserRole;
-use crate::crypto;
 
 enum RoleSelector {
     Id(u32),
@@ -23,16 +23,22 @@ async fn select_role(pool: &Pool<MySql>,
             (Role::Table, Role::RoleId),
             (Role::Table, Role::ApiId),
             (Role::Table, Role::Name),
-            (Role::Table, Role::AccessKey),
             (Role::Table, Role::Multi),
             (Role::Table, Role::IpLock),
             (Role::Table, Role::AccessDuration),
             (Role::Table, Role::RefreshDuration)
         ])
         .columns([
+            (Api::Table, Api::AccessKey)
+        ])
+        .columns([
             (RoleAccess::Table, RoleAccess::ProcedureId)
         ])
         .from(Role::Table)
+        .inner_join(Api::Table, 
+            Expr::col((Role::Table, Role::ApiId))
+            .equals((Api::Table, Api::ApiId))
+        )
         .left_join(RoleAccess::Table, 
             Expr::col((Role::Table, Role::RoleId))
             .equals((RoleAccess::Table, RoleAccess::RoleId))
@@ -83,11 +89,11 @@ async fn select_role(pool: &Pool<MySql>,
             role_schema.id = role_id;
             role_schema.api_id = row.get(1);
             role_schema.name = row.get(2);
-            role_schema.access_key = row.get(3);
-            role_schema.multi = row.get(4);
-            role_schema.ip_lock = row.get(5);
-            role_schema.access_duration = row.get(6);
-            role_schema.refresh_duration = row.get(7);
+            role_schema.multi = row.get(3);
+            role_schema.ip_lock = row.get(4);
+            role_schema.access_duration = row.get(5);
+            role_schema.refresh_duration = row.get(6);
+            role_schema.access_key = row.get(7);
             // on every new procedure_id found add a procedure to role_schema
             let procedure_id = row.try_get(8).ok();
             if last_procedure == None || last_procedure != procedure_id {
@@ -145,8 +151,6 @@ pub(crate) async fn insert_role(pool: &Pool<MySql>,
     refresh_duration: u32,
 ) -> Result<u32, Error> 
 {
-    let access_key = crypto::generate_random_bytes(32);
-
     let (sql, values) = Query::insert()
         .into_table(Role::Table)
         .columns([
@@ -155,8 +159,7 @@ pub(crate) async fn insert_role(pool: &Pool<MySql>,
             Role::Multi,
             Role::IpLock,
             Role::AccessDuration,
-            Role::RefreshDuration,
-            Role::AccessKey
+            Role::RefreshDuration
         ])
         .values([
             api_id.into(),
@@ -164,8 +167,7 @@ pub(crate) async fn insert_role(pool: &Pool<MySql>,
             multi.into(),
             ip_lock.into(),
             access_duration.into(),
-            refresh_duration.into(),
-            access_key.into()
+            refresh_duration.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(MysqlQueryBuilder);
@@ -192,8 +194,7 @@ pub(crate) async fn update_role(pool: &Pool<MySql>,
     multi: Option<bool>, 
     ip_lock: Option<bool>, 
     access_duration: Option<u32>,
-    refresh_duration: Option<u32>,
-    keys: Option<()>
+    refresh_duration: Option<u32>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -214,10 +215,6 @@ pub(crate) async fn update_role(pool: &Pool<MySql>,
     }
     if let Some(value) = refresh_duration {
         stmt = stmt.value(Role::RefreshDuration, value).to_owned();
-    }
-    if let Some(_) = keys {
-        let access_key = crypto::generate_random_bytes(32);
-        stmt = stmt.value(Role::AccessKey, access_key).to_owned();
     }
 
     let (sql, values) = stmt

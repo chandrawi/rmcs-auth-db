@@ -5,7 +5,8 @@ use sea_query_binder::SqlxBinder;
 
 use crate::schema::auth_user::{User, UserRole, UserSchema, UserRoleSchema};
 use crate::schema::auth_role::Role;
-use crate::crypto;
+use crate::schema::api::Api;
+use crate::utility;
 
 enum UserSelector {
     Id(u32),
@@ -28,11 +29,15 @@ async fn select_user(pool: &Pool<MySql>,
             (User::Table, User::Phone)
         ])
         .columns([
+            (Role::Table, Role::ApiId),
             (Role::Table, Role::Name),
             (Role::Table, Role::Multi),
             (Role::Table, Role::IpLock),
             (Role::Table, Role::AccessDuration),
             (Role::Table, Role::RefreshDuration)
+        ])
+        .columns([
+            (Api::Table, Api::AccessKey)
         ])
         .from(User::Table)
         .left_join(UserRole::Table,
@@ -42,6 +47,10 @@ async fn select_user(pool: &Pool<MySql>,
         .left_join(Role::Table,
             Expr::col((UserRole::Table, UserRole::RoleId))
             .equals((Role::Table, Role::RoleId))
+        )
+        .left_join(Api::Table,
+            Expr::col((Role::Table, Role::ApiId))
+            .equals((Api::Table, Api::ApiId))
         )
         .to_owned();
 
@@ -82,14 +91,16 @@ async fn select_user(pool: &Pool<MySql>,
             user_schema.email = row.get(5);
             user_schema.phone = row.get(6);
             // on every new role_id found add a role to user_schema
-            let role_name = row.try_get(7).ok();
+            let role_name = row.try_get(8).ok();
             if let Some(name) = role_name {
                 user_schema.roles.push(UserRoleSchema {
+                    api_id: row.get(7),
                     role: name,
-                    multi: row.get(8),
-                    ip_lock: row.get(9),
-                    access_duration: row.get(10),
-                    refresh_duration: row.get(11)
+                    multi: row.get(9),
+                    ip_lock: row.get(10),
+                    access_duration: row.get(11),
+                    refresh_duration: row.get(12),
+                    access_key: row.get(13)
                 });
             }
             // update api_schema_vec with updated user_schema
@@ -137,11 +148,11 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
     password: &str
 ) -> Result<u32, Error> 
 {
-    let password_hash = crypto::hash_password(&password).or(Err(Error::WorkerCrashed))?;
+    let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
-    let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
-    let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-    let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+    let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
+    let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+    let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
 
     let (sql, values) = Query::insert()
         .into_table(User::Table)
@@ -203,13 +214,13 @@ pub(crate) async fn update_user(pool: &Pool<MySql>,
         stmt = stmt.value(User::Phone, value).to_owned();
     }
     if let Some(value) = password {
-        let password_hash = crypto::hash_password(value).or(Err(Error::WorkerCrashed))?;
+        let password_hash = utility::hash_password(value).or(Err(Error::WorkerCrashed))?;
         stmt = stmt.value(User::Password, password_hash).to_owned();
     }
     if let Some(_) = keys {
-        let (priv_key, pub_key) = crypto::generate_keys().or(Err(Error::WorkerCrashed))?;
-        let priv_der = crypto::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-        let pub_der = crypto::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+        let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
+        let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
+        let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
         stmt = stmt
             .value(User::PublicKey, pub_der)
             .value(User::PrivateKey, priv_der)

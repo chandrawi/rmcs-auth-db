@@ -11,8 +11,7 @@ pub(crate) enum Role {
     Multi,
     IpLock,
     AccessDuration,
-    RefreshDuration,
-    AccessKey
+    RefreshDuration
 }
 
 #[allow(unused)]

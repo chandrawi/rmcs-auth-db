@@ -9,10 +9,11 @@ pub(crate) enum Api {
     Name,
     Address,
     Category,
+    Description,
     Password,
     PublicKey,
     PrivateKey,
-    Description
+    AccessKey
 }
 
 #[allow(unused)]
@@ -33,10 +34,10 @@ pub struct ApiSchema {
     pub category: String,
     pub description: String,
     pub public_key: Vec<u8>,
-    pub private_key: Option<Vec<u8>>,
-    pub password: Option<String>,
+    pub private_key: Vec<u8>,
+    pub password: String,
+    pub access_key: Vec<u8>,
     pub procedures: Vec<ProcedureSchema>,
-    pub access_keys: Vec<AccessKeySchema>
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -48,12 +49,6 @@ pub struct ProcedureSchema {
     pub roles: Vec<String>
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
-pub struct AccessKeySchema {
-    pub role: String,
-    pub access_key: Vec<u8>
-}
-
 impl From<api::ApiSchema> for ApiSchema {
     fn from(value: api::ApiSchema) -> Self {
         Self {
@@ -63,10 +58,10 @@ impl From<api::ApiSchema> for ApiSchema {
             category: value.category,
             description: value.description,
             public_key: value.public_key,
-            private_key: None,
+            private_key: Vec::new(),
             password: value.password,
-            procedures: value.procedures.into_iter().map(|e| e.into()).collect(),
-            access_keys: value.access_keys.into_iter().map(|e| e.into()).collect()
+            access_key: value.access_key,
+            procedures: value.procedures.into_iter().map(|e| e.into()).collect()
         }
     }
 }
@@ -81,8 +76,8 @@ impl Into<api::ApiSchema> for ApiSchema {
             description: self.description,
             public_key: self.public_key,
             password: self.password,
-            procedures: self.procedures.into_iter().map(|e| e.into()).collect(),
-            access_keys: self.access_keys.into_iter().map(|e| e.into()).collect()
+            access_key: self.access_key,
+            procedures: self.procedures.into_iter().map(|e| e.into()).collect()
         }
     }
 }
@@ -107,24 +102,6 @@ impl Into<api::ProcedureSchema> for ProcedureSchema {
             name: self.name,
             description: self.description,
             roles: self.roles.into_iter().map(|e| e.into()).collect()
-        }
-    }
-}
-
-impl From<api::AccessKeySchema> for AccessKeySchema {
-    fn from(value: api::AccessKeySchema) -> Self {
-        Self {
-            role: value.role,
-            access_key: value.access_key,
-        }
-    }
-}
-
-impl Into<api::AccessKeySchema> for AccessKeySchema {
-    fn into(self) -> api::AccessKeySchema {
-        api::AccessKeySchema {
-            role: self.role,
-            access_key: self.access_key,
         }
     }
 }
