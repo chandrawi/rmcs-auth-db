@@ -286,17 +286,17 @@ impl Auth {
         .await
     }
 
+    pub async fn read_access_token(&self, access_id: u32)
+        -> Result<TokenSchema, sqlx::Error>
+    {
+        token::select_token_by_access(&self.pool, access_id)
+        .await
+    }
+
     pub async fn read_refresh_token(&self, refresh_id: &str)
         -> Result<TokenSchema, sqlx::Error>
     {
         token::select_token_by_refresh(&self.pool, refresh_id)
-        .await
-    }
-
-    pub async fn list_access_token(&self, access_id: u32)
-        -> Result<Vec<TokenSchema>, sqlx::Error>
-    {
-        token::select_token_by_access(&self.pool, access_id)
         .await
     }
 
@@ -307,13 +307,6 @@ impl Auth {
         .await
     }
 
-    pub async fn create_refresh_token(&self, access_id: u32, user_id: u32, expire: DateTime<Utc>, ip: &[u8])
-        -> Result<(u32, String), sqlx::Error>
-    {
-        token::insert_token(&self.pool, Some(access_id), user_id, expire, ip)
-        .await
-    }
-
     pub async fn create_access_token(&self, user_id: u32, expire: DateTime<Utc>, ip: &[u8])
         -> Result<(u32, String), sqlx::Error>
     {
@@ -321,10 +314,24 @@ impl Auth {
         .await
     }
 
-    pub async fn delete_refresh_token(&self, refresh_id: &str)
-        -> Result<(), sqlx::Error>
+    pub async fn create_refresh_token(&self, access_id: u32, user_id: u32, expire: DateTime<Utc>, ip: &[u8])
+        -> Result<(u32, String), sqlx::Error>
     {
-        token::delete_token_by_refresh(&self.pool, refresh_id)
+        token::insert_token(&self.pool, Some(access_id), user_id, expire, ip)
+        .await
+    }
+
+    pub async fn update_access_token(&self, access_id: u32, expire: Option<DateTime<Utc>>, ip: Option<&[u8]>)
+        -> Result<String, sqlx::Error>
+    {
+        token::update_token(&self.pool, Some(access_id), None, expire, ip)
+        .await
+    }
+
+    pub async fn update_refresh_token(&self, refresh_id: &str, access_id: Option<u32>, expire: Option<DateTime<Utc>>, ip: Option<&[u8]>)
+        -> Result<String, sqlx::Error>
+    {
+        token::update_token(&self.pool, access_id, Some(refresh_id), expire, ip)
         .await
     }
 
@@ -332,6 +339,13 @@ impl Auth {
         -> Result<(), sqlx::Error>
     {
         token::delete_token_by_access(&self.pool, access_id)
+        .await
+    }
+
+    pub async fn delete_refresh_token(&self, refresh_id: &str)
+        -> Result<(), sqlx::Error>
+    {
+        token::delete_token_by_refresh(&self.pool, refresh_id)
         .await
     }
 

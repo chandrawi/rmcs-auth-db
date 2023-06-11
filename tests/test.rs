@@ -182,20 +182,35 @@ mod tests {
         // create new access token and refresh token
         let expire1 = DateTime::from_str("2023-01-01T00:00:00Z").unwrap();
         let expire2 = DateTime::from_str("2023-01-01T12:00:00Z").unwrap();
-        let (access_id1, refresh_id1_1) = auth.create_access_token(user_id1, expire1, &[192, 168, 0, 1]).await.unwrap();
-        auth.create_refresh_token(access_id1, user_id1, expire2, &[192, 168, 0, 1]).await.unwrap();
+        let (access_id1, refresh_id1) = auth.create_access_token(user_id1, expire1, &[192, 168, 0, 1]).await.unwrap();
+        let access_id2 = access_id1 + 1;
+        auth.create_refresh_token(access_id2, user_id1, expire2, &[192, 168, 0, 1]).await.unwrap();
         auth.create_access_token(user_id1, expire1, &[]).await.unwrap();
 
         // get token data
-        let refresh_token = auth.read_refresh_token(&refresh_id1_1).await.unwrap();
-        let access_tokens = auth.list_access_token(access_id1).await.unwrap();
+        let access_token = auth.read_access_token(access_id2).await.unwrap();
+        let refresh_token = auth.read_refresh_token(&refresh_id1).await.unwrap();
         let user_tokens = auth.list_token_by_user(user_id1).await.unwrap();
 
         assert_eq!(refresh_token.user_id, user_id1);
         assert_eq!(refresh_token.expire, expire1);
         assert_eq!(refresh_token.ip, [192, 168, 0, 1]);
-        assert_eq!(access_tokens.len(), 2);
+        assert_eq!(access_token.expire, expire2);
         assert_eq!(user_tokens.len(), 3);
+
+        // update token
+        let expire3 = DateTime::from_str("2023-01-01T18:00:00Z").unwrap();
+        auth.update_access_token(access_id2, Some(expire3), None).await.unwrap();
+        auth.update_refresh_token(&refresh_id1, None, Some(expire3), Some(&[192, 168, 0, 100])).await.unwrap();
+
+        // get updated token
+        let new_access_token = auth.read_access_token(access_id2).await.unwrap();
+        let refresh_token = auth.read_refresh_token(&refresh_id1).await.unwrap();
+
+        assert_ne!(new_access_token.refresh_id, access_token.refresh_id);
+        assert_eq!(new_access_token.expire, expire3);
+        assert_eq!(refresh_token.expire, expire3);
+        assert_eq!(refresh_token.ip, [192, 168, 0, 100]);
 
         // try to delete resource API, procedure role and user without removing dependent item
         let try_role = auth.delete_role(role_id3).await;
@@ -215,7 +230,7 @@ mod tests {
         auth.delete_token_by_user(user_id1).await.unwrap();
 
         // check if token and user already deleted
-        let result_token = auth.read_refresh_token(&refresh_id1_1).await;
+        let result_token = auth.read_refresh_token(&refresh_id1).await;
         let result_user = auth.read_user(user_id2).await;
 
         assert!(result_token.is_err());

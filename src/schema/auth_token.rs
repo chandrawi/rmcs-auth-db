@@ -5,8 +5,8 @@ use rmcs_auth_api::token;
 #[derive(Iden)]
 pub(crate) enum Token {
     Table,
-    RefreshId,
     AccessId,
+    RefreshId,
     UserId,
     Expire,
     Ip
@@ -14,8 +14,8 @@ pub(crate) enum Token {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TokenSchema {
-    pub refresh_id: String,
     pub access_id: u32,
+    pub refresh_id: String,
     pub user_id: u32,
     pub expire: DateTime<Utc>,
     pub ip: Vec<u8>
