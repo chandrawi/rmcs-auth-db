@@ -6,8 +6,9 @@ use rmcs_auth_api::token;
 pub(crate) enum Token {
     Table,
     AccessId,
-    RefreshId,
     UserId,
+    RefreshToken,
+    AuthToken,
     Expire,
     Ip
 }
@@ -15,8 +16,9 @@ pub(crate) enum Token {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TokenSchema {
     pub access_id: u32,
-    pub refresh_id: String,
     pub user_id: u32,
+    pub refresh_token: String,
+    pub auth_token: String,
     pub expire: DateTime<Utc>,
     pub ip: Vec<u8>
 }
@@ -24,9 +26,10 @@ pub struct TokenSchema {
 impl From<token::TokenSchema> for TokenSchema {
     fn from(value: token::TokenSchema) -> Self {
         TokenSchema {
-            refresh_id: value.refresh_id,
             access_id: value.access_id,
             user_id: value.user_id,
+            refresh_token: value.refresh_token,
+            auth_token: value.auth_token,
             expire: Utc.timestamp_nanos(value.expire),
             ip: value.ip
         }
@@ -36,9 +39,10 @@ impl From<token::TokenSchema> for TokenSchema {
 impl Into<token::TokenSchema> for TokenSchema {
     fn into(self) -> token::TokenSchema {
         token::TokenSchema {
-            refresh_id: self.refresh_id,
             access_id: self.access_id,
             user_id: self.user_id,
+            refresh_token: self.refresh_token,
+            auth_token: self.auth_token,
             expire: self.expire.timestamp_nanos(),
             ip: self.ip
         }

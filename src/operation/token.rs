@@ -9,7 +9,7 @@ use crate::utility;
 
 enum TokenSelector {
     Access(u32),
-    Refresh(String),
+    Auth(String),
     User(u32)
 }
 
@@ -20,8 +20,9 @@ async fn select_token(pool: &Pool<MySql>,
     let mut stmt = Query::select()
         .columns([
             Token::AccessId,
-            Token::RefreshId,
             Token::UserId,
+            Token::RefreshToken,
+            Token::AuthToken,
             Token::Expire,
             Token::Ip
         ])
@@ -32,8 +33,8 @@ async fn select_token(pool: &Pool<MySql>,
         TokenSelector::Access(value) => {
             stmt = stmt.and_where(Expr::col(Token::AccessId).eq(value)).to_owned();
         },
-        TokenSelector::Refresh(value) => {
-            stmt = stmt.and_where(Expr::col(Token::RefreshId).eq(value)).to_owned();
+        TokenSelector::Auth(value) => {
+            stmt = stmt.and_where(Expr::col(Token::AuthToken).eq(value)).to_owned();
         },
         TokenSelector::User(value) => {
             stmt = stmt.and_where(Expr::col(Token::UserId).eq(value)).to_owned();
@@ -45,10 +46,11 @@ async fn select_token(pool: &Pool<MySql>,
         .map(|row: MySqlRow| {
             TokenSchema {
                 access_id: row.get(0),
-                refresh_id: row.get(1),
-                user_id: row.get(2),
-                expire: row.get(3),
-                ip: row.get(4)
+                user_id: row.get(1),
+                refresh_token: row.get(2),
+                auth_token: row.get(3),
+                expire: row.get(4),
+                ip: row.get(5)
             }
         })
         .fetch_all(pool)
@@ -67,14 +69,11 @@ pub(crate) async fn select_token_by_access(pool: &Pool<MySql>,
     }
 }
 
-pub(crate) async fn select_token_by_refresh(pool: &Pool<MySql>,
-    refresh_id: &str
-) -> Result<TokenSchema, Error>
+pub(crate) async fn select_token_by_auth(pool: &Pool<MySql>,
+    auth_token: &str
+) -> Result<Vec<TokenSchema>, Error>
 {
-    match select_token(pool, TokenSelector::Refresh(String::from(refresh_id))).await?.into_iter().next() {
-        Some(value) => Ok(value),
-        None => Err(Error::RowNotFound)
-    }
+    select_token(pool, TokenSelector::Auth(String::from(auth_token))).await
 }
 
 pub(crate) async fn select_token_by_user(pool: &Pool<MySql>,
@@ -85,67 +84,83 @@ pub(crate) async fn select_token_by_user(pool: &Pool<MySql>,
 }
 
 pub(crate) async fn insert_token(pool: &Pool<MySql>, 
-    access_id: Option<u32>,
     user_id: u32, 
+    auth_token: Option<&str>,
     expire: DateTime<Utc>, 
-    ip: &[u8]
-) -> Result<(u32, String), Error> 
+    ip: &[u8],
+    number: u32
+) -> Result<Vec<(u32, String, String)>, Error> 
 {
-    let refresh_id = utility::generate_random_base64(32);
+    let sql = Query::select()
+        .expr(Func::max(Expr::col(Token::AccessId)))
+        .from(Token::Table)
+        .to_string(MysqlQueryBuilder);
+    let mut access_id: u32 = sqlx::query(&sql)
+        .map(|row: MySqlRow| row.try_get(0))
+        .fetch_one(pool)
+        .await
+        .unwrap_or(Ok(0))
+        .unwrap_or(0);
 
-    let access_id = if let Some(value) = access_id {
-        value
-    } else {
-        let sql = Query::select()
-            .expr(Func::max(Expr::col(Token::AccessId)))
-            .from(Token::Table)
-            .to_string(MysqlQueryBuilder);
-        let id: u32 = sqlx::query(&sql)
-            .map(|row: MySqlRow| row.try_get(0))
-            .fetch_one(pool)
-            .await
-            .unwrap_or(Ok(0))
-            .unwrap_or(0);
-        if id < u32::MAX { id + 1 } else { 1 }
+    let auth_token = match auth_token {
+        Some(value) => value.to_owned(),
+        None => utility::generate_random_base64(32)
     };
+    let gens: Vec<(u32, String, String)> = (0..number).map(|_| {
+        access_id = if access_id < u32::MAX { access_id + 1 } else { 1 };
+        let refresh_token = utility::generate_random_base64(32);
+        (access_id, refresh_token, auth_token.clone())
+    })
+    .collect();
 
-    let (sql, values) = Query::insert()
+    let mut stmt = Query::insert()
         .into_table(Token::Table)
         .columns([
-            Token::RefreshId,
             Token::AccessId,
             Token::UserId,
+            Token::RefreshToken,
+            Token::AuthToken,
             Token::Expire,
             Token::Ip
         ])
-        .values([
-            refresh_id.clone().into(),
-            access_id.into(),
+        .to_owned();
+    for gen in gens.clone() {
+        stmt = stmt.values([
+            gen.0.into(),
             user_id.into(),
+            gen.1.into(),
+            gen.2.into(),
             expire.into(),
             ip.to_vec().into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
-        .build_sqlx(MysqlQueryBuilder);
+        .to_owned();
+    }
+    let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
         .await?;
 
-    Ok((access_id, refresh_id))
+    Ok(gens)
 }
 
 pub(crate) async fn update_token(pool: &Pool<MySql>, 
     access_id: Option<u32>,
-    refresh_id: Option<&str>,
+    auth_token: Option<&str>,
     expire: Option<DateTime<Utc>>, 
     ip: Option<&[u8]>
-) -> Result<String, Error> 
+) -> Result<(String, String), Error> 
 {
-    let new_refresh_id = utility::generate_random_base64(32);
+    let refresh_token = utility::generate_random_base64(32);
+    let (auth_token, flag) = match auth_token {
+        Some(value) => (value.to_owned(), true),
+        None => (utility::generate_random_base64(32), false)
+    };
 
     let mut stmt = Query::update()
         .table(Token::Table)
+        .value(Token::RefreshToken, refresh_token.clone()).to_owned()
         .to_owned();
     if let Some(value) = expire {
         stmt = stmt.value(Token::Expire, value).to_owned();
@@ -154,16 +169,13 @@ pub(crate) async fn update_token(pool: &Pool<MySql>,
         stmt = stmt.value(Token::Ip, value).to_owned();
     }
 
-    if let Some(value) = refresh_id {
-        if let Some(v) = access_id {
-            stmt = stmt.value(Token::AccessId, v).to_owned();
+    if let Some(value) = access_id {
+        if flag {
+            stmt = stmt.value(Token::AuthToken, auth_token.clone()).to_owned();
         }
-        stmt = stmt.and_where(Expr::col(Token::RefreshId).eq(value)).to_owned();
+        stmt = stmt.and_where(Expr::col(Token::AccessId).eq(value)).to_owned();
     } else {
-        stmt = stmt
-            .value(Token::RefreshId, new_refresh_id.clone())
-            .and_where(Expr::col(Token::AccessId).eq(access_id.unwrap()))
-            .to_owned();
+        stmt = stmt.and_where(Expr::col(Token::AuthToken).eq(auth_token.clone())).to_owned();
     }
     let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
 
@@ -171,12 +183,7 @@ pub(crate) async fn update_token(pool: &Pool<MySql>,
         .execute(pool)
         .await?;
 
-    Ok(
-        match refresh_id {
-            Some(value) => value.to_owned(),
-            None => new_refresh_id
-        }
-    )
+    Ok((refresh_token, auth_token))
 }
 
 async fn delete_token(pool: &Pool<MySql>, 
@@ -187,11 +194,11 @@ async fn delete_token(pool: &Pool<MySql>,
         .from_table(Token::Table)
         .to_owned();
     match selector {
-        TokenSelector::Refresh(value) => {
-            stmt = stmt.and_where(Expr::col((Token::Table, Token::RefreshId)).eq(value)).to_owned();
-        },
         TokenSelector::Access(value) => {
             stmt = stmt.and_where(Expr::col((Token::Table, Token::AccessId)).eq(value)).to_owned();
+        },
+        TokenSelector::Auth(value) => {
+            stmt = stmt.and_where(Expr::col((Token::Table, Token::AuthToken)).eq(value)).to_owned();
         },
         TokenSelector::User(value) => {
             stmt = stmt.and_where(Expr::col((Token::Table, Token::UserId)).eq(value)).to_owned();
@@ -213,11 +220,11 @@ pub(crate) async fn delete_token_by_access(pool: &Pool<MySql>,
     delete_token(pool, TokenSelector::Access(access_id)).await
 }
 
-pub(crate) async fn delete_token_by_refresh(pool: &Pool<MySql>,
-    refresh_id: &str,
+pub(crate) async fn delete_token_by_auth(pool: &Pool<MySql>,
+    auth_token: &str,
 ) -> Result<(), Error>
 {
-    delete_token(pool, TokenSelector::Refresh(String::from(refresh_id))).await
+    delete_token(pool, TokenSelector::Auth(String::from(auth_token))).await
 }
 
 pub(crate) async fn delete_token_by_user(pool: &Pool<MySql>,
