@@ -1,2 +1,2 @@
-DROP TABLE `role_access`;
-DROP TABLE `role`;
+DROP TABLE "role_access";
+DROP TABLE "role";

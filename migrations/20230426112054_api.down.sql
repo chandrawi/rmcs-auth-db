@@ -1,2 +1,2 @@
-DROP TABLE `api_procedure`;
-DROP TABLE `api`;
+DROP TABLE "api_procedure";
+DROP TABLE "api";

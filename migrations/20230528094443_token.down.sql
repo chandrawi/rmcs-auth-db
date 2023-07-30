@@ -1,1 +1,1 @@
-DROP TABLE `token`;
+DROP TABLE "token";
