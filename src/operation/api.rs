@@ -1,6 +1,6 @@
 use sqlx::{Pool, Row, Error};
-use sqlx::mysql::{MySql, MySqlRow};
-use sea_query::{MysqlQueryBuilder, Query, Expr, Order, Func};
+use sqlx::postgres::{Postgres, PgRow};
+use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
 use sea_query_binder::SqlxBinder;
 
 use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema};
@@ -8,18 +8,18 @@ use crate::schema::auth_role::{Role, RoleAccess};
 use crate::utility;
 
 enum ApiSelector {
-    Id(u32),
+    Id(i32),
     Name(String),
     Category(String)
 }
 
 enum ProcedureSelector {
-    Id(u32),
-    Name(u32, String),
-    Api(u32)
+    Id(i32),
+    Name(i32, String),
+    Api(i32)
 }
 
-async fn select_api(pool: &Pool<MySql>, 
+async fn select_api(pool: &Pool<Postgres>, 
     selector: ApiSelector
 ) -> Result<Vec<ApiSchema>, Error>
 {
@@ -70,21 +70,21 @@ async fn select_api(pool: &Pool<MySql>,
         }
     }
     let (sql, values) = stmt
-        .order_by(Api::ApiId, Order::Asc)
-        .order_by(ApiProcedure::ProcedureId, Order::Asc)
-        .build_sqlx(MysqlQueryBuilder);
+        .order_by((Api::Table, Api::ApiId), Order::Asc)
+        .order_by((ApiProcedure::Table, ApiProcedure::ProcedureId), Order::Asc)
+        .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<u32> = None;
-    let mut last_procedure: Option<u32> = None;
+    let mut last_id: Option<i32> = None;
+    let mut last_procedure: Option<i32> = None;
     let mut role_vec: Vec<String> = Vec::new();
     let mut api_schema_vec: Vec<ApiSchema> = Vec::new();
 
     sqlx::query_with(&sql, values)
-        .map(|row: MySqlRow| {
+        .map(|row: PgRow| {
             // get last api_schema in api_schema_vec or default
             let mut api_schema = api_schema_vec.pop().unwrap_or_default();
             // on every new api_id found update last_id and insert new api_schema to api_schema_vec
-            let api_id: u32 = row.get(0);
+            let api_id: i32 = row.get(0);
             if let Some(value) = last_id {
                 if value != api_id {
                     api_schema_vec.push(api_schema.clone());
@@ -135,15 +135,15 @@ async fn select_api(pool: &Pool<MySql>,
     Ok(api_schema_vec)
 }
 
-pub(crate) async fn select_api_by_id(pool: &Pool<MySql>, 
-    id: u32
+pub(crate) async fn select_api_by_id(pool: &Pool<Postgres>, 
+    id: i32
 ) -> Result<ApiSchema, Error> 
 {
     select_api(pool, ApiSelector::Id(id)).await?.into_iter().next()
         .ok_or(Error::RowNotFound)
 }
 
-pub(crate) async fn select_api_by_name(pool: &Pool<MySql>, 
+pub(crate) async fn select_api_by_name(pool: &Pool<Postgres>, 
     name: &str
 ) -> Result<ApiSchema, Error> 
 {
@@ -151,20 +151,20 @@ pub(crate) async fn select_api_by_name(pool: &Pool<MySql>,
         .ok_or(Error::RowNotFound)
 }
 
-pub(crate) async fn select_api_by_category(pool: &Pool<MySql>, 
+pub(crate) async fn select_api_by_category(pool: &Pool<Postgres>, 
     category: &str
 ) -> Result<Vec<ApiSchema>, Error> 
 {
     select_api(pool, ApiSelector::Category(category.to_owned())).await
 }
 
-pub(crate) async fn insert_api(pool: &Pool<MySql>, 
+pub(crate) async fn insert_api(pool: &Pool<Postgres>, 
     name: &str, 
     address: &str, 
     category: &str, 
     description: &str,
     password: &str
-) -> Result<u32, Error> 
+) -> Result<i32, Error> 
 {
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
@@ -197,7 +197,7 @@ pub(crate) async fn insert_api(pool: &Pool<MySql>,
             access_key.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -206,17 +206,17 @@ pub(crate) async fn insert_api(pool: &Pool<MySql>,
     let sql = Query::select()
         .expr(Func::max(Expr::col(Api::ApiId)))
         .from(Api::Table)
-        .to_string(MysqlQueryBuilder);
-    let id: u32 = sqlx::query(&sql)
-        .map(|row: MySqlRow| row.get(0))
+        .to_string(PostgresQueryBuilder);
+    let id: i32 = sqlx::query(&sql)
+        .map(|row: PgRow| row.get(0))
         .fetch_one(pool)
         .await?;
 
     Ok(id)
 }
 
-pub(crate) async fn update_api(pool: &Pool<MySql>, 
-    id: u32, 
+pub(crate) async fn update_api(pool: &Pool<Postgres>, 
+    id: i32, 
     name: Option<&str>, 
     address: Option<&str>, 
     category: Option<&str>, 
@@ -259,7 +259,7 @@ pub(crate) async fn update_api(pool: &Pool<MySql>,
 
     let (sql, values) = stmt
         .and_where(Expr::col(Api::ApiId).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -268,14 +268,14 @@ pub(crate) async fn update_api(pool: &Pool<MySql>,
     Ok(())
 }
 
-pub(crate) async fn delete_api(pool: &Pool<MySql>, 
-    id: u32
+pub(crate) async fn delete_api(pool: &Pool<Postgres>, 
+    id: i32
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
         .from_table(Api::Table)
         .and_where(Expr::col(Api::ApiId).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -284,7 +284,7 @@ pub(crate) async fn delete_api(pool: &Pool<MySql>,
     Ok(())
 }
 
-async fn select_procedure(pool: &Pool<MySql>, 
+async fn select_procedure(pool: &Pool<Postgres>, 
     selector: ProcedureSelector
 ) -> Result<Vec<ProcedureSchema>, Error> 
 {
@@ -315,7 +315,7 @@ async fn select_procedure(pool: &Pool<MySql>,
         },
         ProcedureSelector::Name(api_id, name) => {
             stmt = stmt
-                .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ProcedureId)).eq(api_id))
+                .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ApiId)).eq(api_id))
                 .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::Name)).eq(name))
                 .to_owned();
         }
@@ -325,17 +325,17 @@ async fn select_procedure(pool: &Pool<MySql>,
     }
     let (sql, values) = stmt
         .order_by(ApiProcedure::ProcedureId, Order::Asc)
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<u32> = None;
+    let mut last_id: Option<i32> = None;
     let mut proc_schema_vec: Vec<ProcedureSchema> = Vec::new();
 
     sqlx::query_with(&sql, values)
-        .map(|row: MySqlRow| {
+        .map(|row: PgRow| {
             // get last proc_schema in proc_schema_vec or default
             let mut proc_schema = proc_schema_vec.pop().unwrap_or_default();
             // on every new proc_id found update last_id and insert new proc_schema to proc_schema_vec
-            let proc_id: u32 = row.get(0);
+            let proc_id: i32 = row.get(0);
             if let Some(value) = last_id {
                 if value != proc_id {
                     proc_schema_vec.push(proc_schema.clone());
@@ -361,16 +361,16 @@ async fn select_procedure(pool: &Pool<MySql>,
     Ok(proc_schema_vec)
 }
 
-pub(crate) async fn select_procedure_by_id(pool: &Pool<MySql>, 
-    id: u32
+pub(crate) async fn select_procedure_by_id(pool: &Pool<Postgres>, 
+    id: i32
 ) -> Result<ProcedureSchema, Error> 
 {
     select_procedure(pool, ProcedureSelector::Id(id)).await?.into_iter().next()
         .ok_or(Error::RowNotFound)
 }
 
-pub(crate) async fn select_procedure_by_name(pool: &Pool<MySql>, 
-    api_id: u32,
+pub(crate) async fn select_procedure_by_name(pool: &Pool<Postgres>, 
+    api_id: i32,
     name: &str
 ) -> Result<ProcedureSchema, Error> 
 {
@@ -378,18 +378,18 @@ pub(crate) async fn select_procedure_by_name(pool: &Pool<MySql>,
         .ok_or(Error::RowNotFound)
 }
 
-pub(crate) async fn select_procedure_by_api(pool: &Pool<MySql>, 
-    api_id: u32
+pub(crate) async fn select_procedure_by_api(pool: &Pool<Postgres>, 
+    api_id: i32
 ) -> Result<Vec<ProcedureSchema>, Error> 
 {
     select_procedure(pool, ProcedureSelector::Api(api_id)).await
 }
 
-pub(crate) async fn insert_procedure(pool: &Pool<MySql>, 
-    api_id: u32,
+pub(crate) async fn insert_procedure(pool: &Pool<Postgres>, 
+    api_id: i32,
     name: &str,
     description: &str
-) -> Result<u32, Error> 
+) -> Result<i32, Error> 
 {
     let (sql, values) = Query::insert()
         .into_table(ApiProcedure::Table)
@@ -404,7 +404,7 @@ pub(crate) async fn insert_procedure(pool: &Pool<MySql>,
             description.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -413,17 +413,17 @@ pub(crate) async fn insert_procedure(pool: &Pool<MySql>,
     let sql = Query::select()
         .expr(Func::max(Expr::col(ApiProcedure::ProcedureId)))
         .from(ApiProcedure::Table)
-        .to_string(MysqlQueryBuilder);
-    let id: u32 = sqlx::query(&sql)
-        .map(|row: MySqlRow| row.get(0))
+        .to_string(PostgresQueryBuilder);
+    let id: i32 = sqlx::query(&sql)
+        .map(|row: PgRow| row.get(0))
         .fetch_one(pool)
         .await?;
 
     Ok(id)
 }
 
-pub(crate) async fn update_procedure(pool: &Pool<MySql>, 
-    id: u32,
+pub(crate) async fn update_procedure(pool: &Pool<Postgres>, 
+    id: i32,
     name: Option<&str>,
     description: Option<&str>
 ) -> Result<(), Error> 
@@ -441,7 +441,7 @@ pub(crate) async fn update_procedure(pool: &Pool<MySql>,
 
     let (sql, values) = stmt
         .and_where(Expr::col(ApiProcedure::ProcedureId).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -450,14 +450,14 @@ pub(crate) async fn update_procedure(pool: &Pool<MySql>,
     Ok(())
 }
 
-pub(crate) async fn delete_procedure(pool: &Pool<MySql>, 
-    id: u32
+pub(crate) async fn delete_procedure(pool: &Pool<Postgres>, 
+    id: i32
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
         .from_table(ApiProcedure::Table)
         .and_where(Expr::col(ApiProcedure::ProcedureId).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)

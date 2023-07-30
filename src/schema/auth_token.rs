@@ -15,8 +15,8 @@ pub(crate) enum Token {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TokenSchema {
-    pub access_id: u32,
-    pub user_id: u32,
+    pub access_id: i32,
+    pub user_id: i32,
     pub refresh_token: String,
     pub auth_token: String,
     pub expire: DateTime<Utc>,

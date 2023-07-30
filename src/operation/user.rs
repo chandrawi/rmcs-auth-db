@@ -1,6 +1,6 @@
 use sqlx::{Pool, Row, Error};
-use sqlx::mysql::{MySql, MySqlRow};
-use sea_query::{MysqlQueryBuilder, Query, Expr, Func};
+use sqlx::postgres::{Postgres, PgRow};
+use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
 use sea_query_binder::SqlxBinder;
 
 use crate::schema::auth_user::{User, UserRole, UserSchema, UserRoleSchema};
@@ -9,12 +9,12 @@ use crate::schema::api::Api;
 use crate::utility;
 
 enum UserSelector {
-    Id(u32),
+    Id(i32),
     Name(String),
-    Role(u32)
+    Role(i32)
 }
 
-async fn select_user(pool: &Pool<MySql>, 
+async fn select_user(pool: &Pool<Postgres>, 
     selector: UserSelector
 ) -> Result<Vec<UserSchema>, Error>
 {
@@ -65,17 +65,20 @@ async fn select_user(pool: &Pool<MySql>,
             stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(value)).to_owned();
         }
     }
-    let (sql, values) = stmt.build_sqlx(MysqlQueryBuilder);
+    let (sql, values) = stmt
+        .order_by((User::Table, User::UserId), Order::Asc)
+        .order_by((UserRole::Table, UserRole::RoleId), Order::Asc)
+        .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<u32> = None;
+    let mut last_id: Option<i32> = None;
     let mut user_schema_vec: Vec<UserSchema> = Vec::new();
 
     sqlx::query_with(&sql, values)
-        .map(|row: MySqlRow| {
+        .map(|row: PgRow| {
             // get last user_schema in user_schema_vec or default
             let mut user_schema = user_schema_vec.pop().unwrap_or_default();
             // on every new user_id found update last_id and insert new user_schema to user_schema_vec
-            let user_id: u32 = row.get(0);
+            let user_id: i32 = row.get(0);
             if let Some(value) = last_id {
                 if value != user_id {
                     user_schema_vec.push(user_schema.clone());
@@ -112,8 +115,8 @@ async fn select_user(pool: &Pool<MySql>,
     Ok(user_schema_vec)
 }
 
-pub(crate) async fn select_user_by_id(pool: &Pool<MySql>,
-    id: u32
+pub(crate) async fn select_user_by_id(pool: &Pool<Postgres>,
+    id: i32
 ) -> Result<UserSchema, Error>
 {
     let users = select_user(pool, UserSelector::Id(id)).await;
@@ -123,7 +126,7 @@ pub(crate) async fn select_user_by_id(pool: &Pool<MySql>,
     }
 }
 
-pub(crate) async fn select_user_by_name(pool: &Pool<MySql>,
+pub(crate) async fn select_user_by_name(pool: &Pool<Postgres>,
     name: &str
 ) -> Result<UserSchema, Error>
 {
@@ -134,19 +137,19 @@ pub(crate) async fn select_user_by_name(pool: &Pool<MySql>,
     }
 }
 
-pub(crate) async fn select_user_by_role(pool: &Pool<MySql>,
-    role_id: u32
+pub(crate) async fn select_user_by_role(pool: &Pool<Postgres>,
+    role_id: i32
 ) -> Result<Vec<UserSchema>, Error>
 {
     select_user(pool, UserSelector::Role(role_id)).await
 }
 
-pub(crate) async fn insert_user(pool: &Pool<MySql>, 
+pub(crate) async fn insert_user(pool: &Pool<Postgres>, 
     name: &str, 
     email: &str,
     phone: &str,
     password: &str
-) -> Result<u32, Error> 
+) -> Result<i32, Error> 
 {
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
@@ -173,7 +176,7 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
             phone.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -182,17 +185,17 @@ pub(crate) async fn insert_user(pool: &Pool<MySql>,
     let sql = Query::select()
         .expr(Func::max(Expr::col(User::UserId)))
         .from(User::Table)
-        .to_string(MysqlQueryBuilder);
-    let id: u32 = sqlx::query(&sql)
-        .map(|row: MySqlRow| row.get(0))
+        .to_string(PostgresQueryBuilder);
+    let id: i32 = sqlx::query(&sql)
+        .map(|row: PgRow| row.get(0))
         .fetch_one(pool)
         .await?;
 
     Ok(id)
 }
 
-pub(crate) async fn update_user(pool: &Pool<MySql>, 
-    id: u32, 
+pub(crate) async fn update_user(pool: &Pool<Postgres>, 
+    id: i32, 
     name: Option<&str>, 
     email: Option<&str>,
     phone: Option<&str>,
@@ -229,7 +232,7 @@ pub(crate) async fn update_user(pool: &Pool<MySql>,
 
     let (sql, values) = stmt
         .and_where(Expr::col(User::UserId).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -238,14 +241,14 @@ pub(crate) async fn update_user(pool: &Pool<MySql>,
     Ok(())
 }
 
-pub(crate) async fn delete_user(pool: &Pool<MySql>, 
-    id: u32
+pub(crate) async fn delete_user(pool: &Pool<Postgres>, 
+    id: i32
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
         .from_table(User::Table)
         .and_where(Expr::col(User::UserId).eq(id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -254,9 +257,9 @@ pub(crate) async fn delete_user(pool: &Pool<MySql>,
     Ok(())
 }
 
-pub(crate) async fn add_user_role(pool: &Pool<MySql>, 
-    id: u32,
-    role_id: u32
+pub(crate) async fn add_user_role(pool: &Pool<Postgres>, 
+    id: i32,
+    role_id: i32
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::insert()
@@ -270,7 +273,7 @@ pub(crate) async fn add_user_role(pool: &Pool<MySql>,
             role_id.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)
@@ -279,16 +282,16 @@ pub(crate) async fn add_user_role(pool: &Pool<MySql>,
     Ok(())
 }
 
-pub(crate) async fn remove_user_role(pool: &Pool<MySql>, 
-    id: u32,
-    role_id: u32
+pub(crate) async fn remove_user_role(pool: &Pool<Postgres>, 
+    id: i32,
+    role_id: i32
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
         .from_table(UserRole::Table)
         .and_where(Expr::col(UserRole::UserId).eq(id))
         .and_where(Expr::col(UserRole::RoleId).eq(role_id))
-        .build_sqlx(MysqlQueryBuilder);
+        .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_with(&sql, values)
         .execute(pool)

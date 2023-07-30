@@ -24,15 +24,15 @@ pub(crate) enum RoleAccess {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct RoleSchema {
-    pub id: u32,
-    pub api_id: u32,
+    pub id: i32,
+    pub api_id: i32,
     pub name: String,
     pub multi: bool,
     pub ip_lock: bool,
-    pub access_duration: u32,
-    pub refresh_duration: u32,
+    pub access_duration: i32,
+    pub refresh_duration: i32,
     pub access_key: Vec<u8>,
-    pub procedures: Vec<u32>
+    pub procedures: Vec<i32>
 }
 
 impl From<role::RoleSchema> for RoleSchema {

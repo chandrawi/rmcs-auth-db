@@ -22,7 +22,7 @@ pub(crate) enum UserRole {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct UserSchema {
-    pub id: u32,
+    pub id: i32,
     pub name: String,
     pub email: String,
     pub phone: String,
@@ -34,12 +34,12 @@ pub struct UserSchema {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct UserRoleSchema {
-    pub api_id: u32,
+    pub api_id: i32,
     pub role: String,
     pub multi: bool,
     pub ip_lock: bool,
-    pub access_duration: u32,
-    pub refresh_duration: u32,
+    pub access_duration: i32,
+    pub refresh_duration: i32,
     pub access_key: Vec<u8>
 }
 

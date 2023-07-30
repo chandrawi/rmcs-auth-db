@@ -28,7 +28,7 @@ pub(crate) enum ApiProcedure {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ApiSchema {
-    pub id: u32,
+    pub id: i32,
     pub name: String,
     pub address: String,
     pub category: String,
@@ -42,8 +42,8 @@ pub struct ApiSchema {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ProcedureSchema {
-    pub id: u32,
-    pub api_id: u32,
+    pub id: i32,
+    pub api_id: i32,
     pub name: String,
     pub description: String,
     pub roles: Vec<String>
