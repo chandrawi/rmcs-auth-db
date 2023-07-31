@@ -1,62 +1,41 @@
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use std::vec;
-
-    use sqlx::{Pool, Row, Error};
-    use sqlx::mysql::{MySql, MySqlRow, MySqlPoolOptions};
+    use sqlx::{Pool, Error};
+    use sqlx::postgres::{Postgres, PgPoolOptions};
     use sqlx::types::chrono::DateTime;
     use argon2::{Argon2, PasswordHash, PasswordVerifier};
     use rmcs_auth_db::Auth;
 
-    async fn get_connection_pool() -> Result<Pool<MySql>, Error>
+    async fn get_connection_pool() -> Result<Pool<Postgres>, Error>
     {
         dotenvy::dotenv().ok();
         let url = std::env::var("DATABASE_AUTH_TEST_URL").unwrap();
-        MySqlPoolOptions::new()
+        PgPoolOptions::new()
             .max_connections(100)
             .connect(&url)
             .await
     }
 
-    async fn check_tables_exist(pool: &Pool<MySql>) -> Result<bool, Error>
+    async fn truncate_tables(pool: &Pool<Postgres>) -> Result<(), Error>
     {
-        let sql = "SHOW TABLES;";
-        let tables: Vec<String> = sqlx::query(sql)
-            .map(|row: MySqlRow| row.get(0))
-            .fetch_all(pool)
+        let sql = "TRUNCATE TABLE \"token\", \"user_role\", \"user\", \"role_access\", \"role\", \"api_procedure\", \"api\";";
+        sqlx::query(sql)
+            .execute(pool)
             .await?;
-
-        Ok(tables == vec![
-            String::from("_sqlx_migrations"),
-            String::from("api"),
-            String::from("api_procedure"),
-            String::from("role"),
-            String::from("role_access"),
-            String::from("token"),
-            String::from("user"),
-            String::from("user_role")
-        ])
+        Ok(())
     }
 
     #[sqlx::test]
     async fn test_auth()
     {
-        // std::env::set_var("RUST_BACKTRACE", "1");
+        std::env::set_var("RUST_BACKTRACE", "1");
 
         let pool = get_connection_pool().await.unwrap();
         let auth = Auth::new_with_pool(pool);
 
-        // drop tables from previous test if exists
-        if check_tables_exist(&auth.pool).await.unwrap() {
-            sqlx::migrate!().undo(&auth.pool, 2).await.unwrap();
-        }
-        // create tables for testing
-        sqlx::migrate!().run(&auth.pool).await.unwrap();
-        // check if all tables successfully created
-        if !check_tables_exist(&auth.pool).await.unwrap() {
-            panic!("Database migration failed!");
-        }
+        // truncate all auth database tables before test
+        truncate_tables(&auth.pool).await.unwrap();
 
         // create new resource API
         let password_api = "Ap1_P4s5w0rd";
@@ -182,10 +161,11 @@ mod tests {
         // create new access token and refresh token
         let expire1 = DateTime::from_str("2023-01-01T00:00:00Z").unwrap();
         let expire2 = DateTime::from_str("2023-01-01T12:00:00Z").unwrap();
-        let (access_id1, _, auth_token1) = auth.create_access_token(user_id1, " ", expire1, &[192, 168, 0, 1]).await.unwrap();
+        let auth_token = "rGKrHrDuWXt2CDbjmrt1SHbmea86wIQb";
+        let (access_id1, _, auth_token1) = auth.create_access_token(user_id1, auth_token, expire1, &[192, 168, 0, 1]).await.unwrap();
         let access_id2 = access_id1 + 1;
         auth.create_auth_token(user_id1, expire2, &[192, 168, 0, 1], 1).await.unwrap();
-        auth.create_access_token(user_id1, " ", expire1, &[]).await.unwrap();
+        auth.create_access_token(user_id1, auth_token, expire1, &[]).await.unwrap();
 
         // get token data
         let access_token = auth.read_access_token(access_id2).await.unwrap();
