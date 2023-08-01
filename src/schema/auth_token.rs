@@ -1,5 +1,5 @@
 use sea_query::Iden;
-use sqlx::types::chrono::{DateTime, Utc, TimeZone};
+use sqlx::types::chrono::NaiveDateTime;
 use rmcs_auth_api::token;
 
 #[derive(Iden)]
@@ -19,7 +19,7 @@ pub struct TokenSchema {
     pub user_id: i32,
     pub refresh_token: String,
     pub auth_token: String,
-    pub expire: DateTime<Utc>,
+    pub expire: NaiveDateTime,
     pub ip: Vec<u8>
 }
 
@@ -30,7 +30,7 @@ impl From<token::TokenSchema> for TokenSchema {
             user_id: value.user_id,
             refresh_token: value.refresh_token,
             auth_token: value.auth_token,
-            expire: Utc.timestamp_nanos(value.expire),
+            expire: NaiveDateTime::from_timestamp_micros(value.expire).unwrap_or_default(),
             ip: value.ip
         }
     }

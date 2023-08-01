@@ -1,6 +1,6 @@
 use sqlx::{Pool, Row, Error};
 use sqlx::postgres::{Postgres, PgRow};
-use sqlx::types::chrono::{DateTime, Utc};
+use sqlx::types::chrono::NaiveDateTime;
 use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
 use sea_query_binder::SqlxBinder;
 
@@ -88,7 +88,7 @@ pub(crate) async fn select_token_by_user(pool: &Pool<Postgres>,
 pub(crate) async fn insert_token(pool: &Pool<Postgres>, 
     user_id: i32, 
     auth_token: Option<&str>,
-    expire: DateTime<Utc>, 
+    expire: NaiveDateTime, 
     ip: &[u8],
     number: u32
 ) -> Result<Vec<(i32, String, String)>, Error> 
@@ -150,7 +150,7 @@ pub(crate) async fn insert_token(pool: &Pool<Postgres>,
 pub(crate) async fn update_token(pool: &Pool<Postgres>, 
     access_id: Option<i32>,
     auth_token: Option<&str>,
-    expire: Option<DateTime<Utc>>, 
+    expire: Option<NaiveDateTime>, 
     ip: Option<&[u8]>
 ) -> Result<(String, String), Error> 
 {
