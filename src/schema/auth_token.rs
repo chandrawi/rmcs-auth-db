@@ -43,7 +43,7 @@ impl Into<token::TokenSchema> for TokenSchema {
             user_id: self.user_id,
             refresh_token: self.refresh_token,
             auth_token: self.auth_token,
-            expire: self.expire.timestamp_nanos(),
+            expire: self.expire.timestamp_micros(),
             ip: self.ip
         }
     }
