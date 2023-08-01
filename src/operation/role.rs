@@ -1,17 +1,18 @@
 use sqlx::{Pool, Row, Error};
 use sqlx::postgres::{Postgres, PgRow};
-use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
+use sea_query::{PostgresQueryBuilder, Query, Expr, Order};
 use sea_query_binder::SqlxBinder;
+use uuid::Uuid;
 
 use crate::schema::auth_role::{Role, RoleAccess, RoleSchema};
 use crate::schema::api::Api;
 use crate::schema::auth_user::UserRole;
 
 enum RoleSelector {
-    Id(i32),
-    Name(i32, String),
-    Api(i32),
-    User(i32)
+    Id(Uuid),
+    Name(Uuid, String),
+    Api(Uuid),
+    User(Uuid)
 }
 
 async fn select_role(pool: &Pool<Postgres>, 
@@ -71,8 +72,8 @@ async fn select_role(pool: &Pool<Postgres>,
         .order_by((RoleAccess::Table, RoleAccess::ProcedureId), Order::Asc)
         .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<i32> = None;
-    let mut last_procedure: Option<i32> = None;
+    let mut last_id: Option<Uuid> = None;
+    let mut last_procedure: Option<Uuid> = None;
     let mut role_schema_vec: Vec<RoleSchema> = Vec::new();
 
     sqlx::query_with(&sql, values)
@@ -80,7 +81,7 @@ async fn select_role(pool: &Pool<Postgres>,
             // get last role_schema in role_schema_vec or default
             let mut role_schema = role_schema_vec.pop().unwrap_or_default();
             // on every new role_id found update last_id and insert new role_schema to role_schema_vec
-            let role_id: i32 = row.get(0);
+            let role_id: Uuid = row.get(0);
             if let Some(value) = last_id {
                 if value != role_id {
                     role_schema_vec.push(role_schema.clone());
@@ -115,7 +116,7 @@ async fn select_role(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_role_by_id(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<RoleSchema, Error> 
 {
     select_role(pool, RoleSelector::Id(id)).await?.into_iter().next()
@@ -123,7 +124,7 @@ pub(crate) async fn select_role_by_id(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_role_by_name(pool: &Pool<Postgres>, 
-    api_id: i32,
+    api_id: Uuid,
     name: &str
 ) -> Result<RoleSchema, Error> 
 {
@@ -132,31 +133,34 @@ pub(crate) async fn select_role_by_name(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_role_by_api(pool: &Pool<Postgres>, 
-    api_id: i32
+    api_id: Uuid
 ) -> Result<Vec<RoleSchema>, Error> 
 {
     select_role(pool, RoleSelector::Api(api_id)).await
 }
 
 pub(crate) async fn select_role_by_user(pool: &Pool<Postgres>, 
-    user_id: i32
+    user_id: Uuid
 ) -> Result<Vec<RoleSchema>, Error> 
 {
     select_role(pool, RoleSelector::User(user_id)).await
 }
 
 pub(crate) async fn insert_role(pool: &Pool<Postgres>, 
-    api_id: i32,
+    api_id: Uuid,
     name: &str, 
     multi: bool, 
     ip_lock: bool, 
     access_duration: i32,
     refresh_duration: i32,
-) -> Result<i32, Error> 
+) -> Result<Uuid, Error> 
 {
+    let role_id = Uuid::new_v4();
+
     let (sql, values) = Query::insert()
         .into_table(Role::Table)
         .columns([
+            Role::RoleId,
             Role::ApiId,
             Role::Name,
             Role::Multi,
@@ -165,6 +169,7 @@ pub(crate) async fn insert_role(pool: &Pool<Postgres>,
             Role::RefreshDuration
         ])
         .values([
+            role_id.into(),
             api_id.into(),
             name.into(),
             multi.into(),
@@ -179,20 +184,11 @@ pub(crate) async fn insert_role(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    let sql = Query::select()
-        .expr(Func::max(Expr::col(Role::RoleId)))
-        .from(Role::Table)
-        .to_string(PostgresQueryBuilder);
-    let id: i32 = sqlx::query(&sql)
-        .map(|row: PgRow| row.get(0))
-        .fetch_one(pool)
-        .await?;
-
-    Ok(id)
+    Ok(role_id)
 }
 
 pub(crate) async fn update_role(pool: &Pool<Postgres>, 
-    id: i32, 
+    id: Uuid, 
     name: Option<&str>, 
     multi: Option<bool>, 
     ip_lock: Option<bool>, 
@@ -232,7 +228,7 @@ pub(crate) async fn update_role(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn delete_role(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
@@ -248,8 +244,8 @@ pub(crate) async fn delete_role(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn add_role_access(pool: &Pool<Postgres>, 
-    id: i32,
-    procedure_id: i32
+    id: Uuid,
+    procedure_id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::insert()
@@ -273,8 +269,8 @@ pub(crate) async fn add_role_access(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn remove_role_access(pool: &Pool<Postgres>, 
-    id: i32,
-    procedure_id: i32
+    id: Uuid,
+    procedure_id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()

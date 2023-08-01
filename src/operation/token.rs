@@ -3,6 +3,7 @@ use sqlx::postgres::{Postgres, PgRow};
 use sqlx::types::chrono::NaiveDateTime;
 use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
 use sea_query_binder::SqlxBinder;
+use uuid::Uuid;
 
 use crate::schema::auth_token::{Token, TokenSchema};
 use crate::utility;
@@ -10,7 +11,7 @@ use crate::utility;
 enum TokenSelector {
     Access(i32),
     Auth(String),
-    User(i32)
+    User(Uuid)
 }
 
 async fn select_token(pool: &Pool<Postgres>, 
@@ -79,14 +80,14 @@ pub(crate) async fn select_token_by_auth(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_token_by_user(pool: &Pool<Postgres>,
-    user_id: i32
+    user_id: Uuid
 ) -> Result<Vec<TokenSchema>, Error>
 {
     select_token(pool, TokenSelector::User(user_id)).await
 }
 
 pub(crate) async fn insert_token(pool: &Pool<Postgres>, 
-    user_id: i32, 
+    user_id: Uuid, 
     auth_token: Option<&str>,
     expire: NaiveDateTime, 
     ip: &[u8],
@@ -230,7 +231,7 @@ pub(crate) async fn delete_token_by_auth(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn delete_token_by_user(pool: &Pool<Postgres>,
-    user_id: i32
+    user_id: Uuid
 ) -> Result<(), Error>
 {
     delete_token(pool, TokenSelector::User(user_id)).await

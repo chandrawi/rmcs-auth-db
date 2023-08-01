@@ -1,22 +1,23 @@
 use sqlx::{Pool, Row, Error};
 use sqlx::postgres::{Postgres, PgRow};
-use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
+use sea_query::{PostgresQueryBuilder, Query, Expr, Order};
 use sea_query_binder::SqlxBinder;
+use uuid::Uuid;
 
 use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema};
 use crate::schema::auth_role::{Role, RoleAccess};
 use crate::utility;
 
 enum ApiSelector {
-    Id(i32),
+    Id(Uuid),
     Name(String),
     Category(String)
 }
 
 enum ProcedureSelector {
-    Id(i32),
-    Name(i32, String),
-    Api(i32)
+    Id(Uuid),
+    Name(Uuid, String),
+    Api(Uuid)
 }
 
 async fn select_api(pool: &Pool<Postgres>, 
@@ -74,8 +75,8 @@ async fn select_api(pool: &Pool<Postgres>,
         .order_by((ApiProcedure::Table, ApiProcedure::ProcedureId), Order::Asc)
         .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<i32> = None;
-    let mut last_procedure: Option<i32> = None;
+    let mut last_id: Option<Uuid> = None;
+    let mut last_procedure: Option<Uuid> = None;
     let mut role_vec: Vec<String> = Vec::new();
     let mut api_schema_vec: Vec<ApiSchema> = Vec::new();
 
@@ -84,7 +85,7 @@ async fn select_api(pool: &Pool<Postgres>,
             // get last api_schema in api_schema_vec or default
             let mut api_schema = api_schema_vec.pop().unwrap_or_default();
             // on every new api_id found update last_id and insert new api_schema to api_schema_vec
-            let api_id: i32 = row.get(0);
+            let api_id: Uuid = row.get(0);
             if let Some(value) = last_id {
                 if value != api_id {
                     api_schema_vec.push(api_schema.clone());
@@ -136,7 +137,7 @@ async fn select_api(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_api_by_id(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<ApiSchema, Error> 
 {
     select_api(pool, ApiSelector::Id(id)).await?.into_iter().next()
@@ -164,8 +165,10 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
     category: &str, 
     description: &str,
     password: &str
-) -> Result<i32, Error> 
+) -> Result<Uuid, Error> 
 {
+    let api_id = Uuid::new_v4();
+
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
     let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
@@ -177,6 +180,7 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
     let (sql, values) = Query::insert()
         .into_table(Api::Table)
         .columns([
+            Api::ApiId,
             Api::Name,
             Api::Address,
             Api::Category,
@@ -187,6 +191,7 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
             Api::AccessKey
         ])
         .values([
+            api_id.into(),
             name.into(),
             address.into(),
             category.into(),
@@ -203,20 +208,11 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    let sql = Query::select()
-        .expr(Func::max(Expr::col(Api::ApiId)))
-        .from(Api::Table)
-        .to_string(PostgresQueryBuilder);
-    let id: i32 = sqlx::query(&sql)
-        .map(|row: PgRow| row.get(0))
-        .fetch_one(pool)
-        .await?;
-
-    Ok(id)
+    Ok(api_id)
 }
 
 pub(crate) async fn update_api(pool: &Pool<Postgres>, 
-    id: i32, 
+    id: Uuid, 
     name: Option<&str>, 
     address: Option<&str>, 
     category: Option<&str>, 
@@ -269,7 +265,7 @@ pub(crate) async fn update_api(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn delete_api(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
@@ -327,7 +323,7 @@ async fn select_procedure(pool: &Pool<Postgres>,
         .order_by(ApiProcedure::ProcedureId, Order::Asc)
         .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<i32> = None;
+    let mut last_id: Option<Uuid> = None;
     let mut proc_schema_vec: Vec<ProcedureSchema> = Vec::new();
 
     sqlx::query_with(&sql, values)
@@ -335,7 +331,7 @@ async fn select_procedure(pool: &Pool<Postgres>,
             // get last proc_schema in proc_schema_vec or default
             let mut proc_schema = proc_schema_vec.pop().unwrap_or_default();
             // on every new proc_id found update last_id and insert new proc_schema to proc_schema_vec
-            let proc_id: i32 = row.get(0);
+            let proc_id: Uuid = row.get(0);
             if let Some(value) = last_id {
                 if value != proc_id {
                     proc_schema_vec.push(proc_schema.clone());
@@ -362,7 +358,7 @@ async fn select_procedure(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_procedure_by_id(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<ProcedureSchema, Error> 
 {
     select_procedure(pool, ProcedureSelector::Id(id)).await?.into_iter().next()
@@ -370,7 +366,7 @@ pub(crate) async fn select_procedure_by_id(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_procedure_by_name(pool: &Pool<Postgres>, 
-    api_id: i32,
+    api_id: Uuid,
     name: &str
 ) -> Result<ProcedureSchema, Error> 
 {
@@ -379,26 +375,30 @@ pub(crate) async fn select_procedure_by_name(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_procedure_by_api(pool: &Pool<Postgres>, 
-    api_id: i32
+    api_id: Uuid
 ) -> Result<Vec<ProcedureSchema>, Error> 
 {
     select_procedure(pool, ProcedureSelector::Api(api_id)).await
 }
 
 pub(crate) async fn insert_procedure(pool: &Pool<Postgres>, 
-    api_id: i32,
+    api_id: Uuid,
     name: &str,
     description: &str
-) -> Result<i32, Error> 
+) -> Result<Uuid, Error> 
 {
+    let procedure_id = Uuid::new_v4();
+
     let (sql, values) = Query::insert()
         .into_table(ApiProcedure::Table)
         .columns([
+            ApiProcedure::ProcedureId,
             ApiProcedure::ApiId,
             ApiProcedure::Name,
             ApiProcedure::Description
         ])
         .values([
+            procedure_id.into(),
             api_id.into(),
             name.into(),
             description.into()
@@ -410,20 +410,11 @@ pub(crate) async fn insert_procedure(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    let sql = Query::select()
-        .expr(Func::max(Expr::col(ApiProcedure::ProcedureId)))
-        .from(ApiProcedure::Table)
-        .to_string(PostgresQueryBuilder);
-    let id: i32 = sqlx::query(&sql)
-        .map(|row: PgRow| row.get(0))
-        .fetch_one(pool)
-        .await?;
-
-    Ok(id)
+    Ok(procedure_id)
 }
 
 pub(crate) async fn update_procedure(pool: &Pool<Postgres>, 
-    id: i32,
+    id: Uuid,
     name: Option<&str>,
     description: Option<&str>
 ) -> Result<(), Error> 
@@ -451,7 +442,7 @@ pub(crate) async fn update_procedure(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn delete_procedure(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()

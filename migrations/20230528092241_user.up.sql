@@ -1,5 +1,5 @@
 CREATE TABLE "user" (
-  "user_id" serial NOT NULL,
+  "user_id" uuid NOT NULL,
   "name" varchar(64) NOT NULL,
   "email" varchar(64) NOT NULL,
   "phone" varchar(32) NOT NULL,
@@ -11,8 +11,8 @@ CREATE TABLE "user" (
 );
 
 CREATE TABLE "user_role" (
-  "user_id" int NOT NULL,
-  "role_id" int NOT NULL,
+  "user_id" uuid NOT NULL,
+  "role_id" uuid NOT NULL,
   PRIMARY KEY ("user_id","role_id"),
   FOREIGN KEY ("user_id")
     REFERENCES "user" ("user_id"),

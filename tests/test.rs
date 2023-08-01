@@ -3,6 +3,7 @@ mod tests {
     use sqlx::{Pool, Error};
     use sqlx::postgres::{Postgres, PgPoolOptions};
     use sqlx::types::chrono::NaiveDateTime;
+    use uuid::Uuid;
     use argon2::{Argon2, PasswordHash, PasswordVerifier};
     use rmcs_auth_db::Auth;
 
@@ -41,26 +42,27 @@ mod tests {
         let api_id1 = auth.create_api("Resource1", "localhost:9001", "RESOURCE", "", password_api).await.unwrap();
         let api_id2 = auth.create_api("Resource_2", "localhost:9002", "RESOURCE", "",  password_api).await.unwrap();
 
-        // get newly created resource at the first of resource API list
-        let apis = auth.list_api_by_category("RESOURCE").await.unwrap();
-        let first_api = apis.into_iter().next().unwrap();
-        let api = auth.read_api(api_id1).await.unwrap();
-
         // create new procedure for newly created resource API
         let proc_id1 = auth.create_procedure(api_id1, "ReadResourceData", "").await.unwrap();
         let proc_id2 = auth.create_procedure(api_id1, "CreateData", "").await.unwrap();
         let proc_id3 = auth.create_procedure(api_id1, "DeleteData", "").await.unwrap();
         let proc_id4 = auth.create_procedure(api_id2, "ReadConfig", "").await.unwrap();
 
+        // get newly created resource at the first of resource API list
+        let apis = auth.list_api_by_category("RESOURCE").await.unwrap();
+        let api_ids: Vec<Uuid> = apis.iter().map(|e| e.id).collect();
+        let api = auth.read_api(api_id1).await.unwrap();
+        let api_proc_ids: Vec<Uuid> = api.procedures.iter().map(|e| e.id).collect();
+
         // get newly created procedure at the first of procedure list
         let procedures = auth.list_procedure_by_api(api_id1).await.unwrap();
-        let procedure = procedures.into_iter().next().unwrap();
+        let proc_ids: Vec<Uuid> = procedures.iter().map(|e| e.id).collect();
 
-        assert_eq!(first_api.id, api_id1);
         assert_eq!(api.name, "Resource1");
         assert_eq!(api.address, "localhost:9001");
-        assert_eq!(procedure.api_id, api.id);
-        assert_eq!(procedure.name, "ReadResourceData");
+        assert!(api_ids.contains(&api_id1));
+        assert!(proc_ids.contains(&proc_id1));
+        assert_eq!(api_proc_ids, proc_ids);
 
         let (pub_key, priv_key) = (api.public_key, api.private_key);
         assert!(pub_key.len() > 64);
@@ -81,14 +83,16 @@ mod tests {
 
         // get role data
         let roles = auth.list_role_by_api(api_id1).await.unwrap();
-        let first_role = roles.into_iter().next().unwrap();
+        let role_ids: Vec<Uuid> = roles.iter().map(|e| e.id).collect();
         let role = auth.read_role(role_id1).await.unwrap();
 
-        assert_eq!(first_role.id, role_id1);
+        assert!(role_ids.contains(&role_id1));
         assert_eq!(role.name, "administrator");
         assert_eq!(role.multi, false);
         assert_eq!(role.ip_lock, false);
-        assert_eq!(role.procedures, [proc_id1, proc_id2, proc_id3]);
+        assert!(role.procedures.contains(&proc_id1));
+        assert!(role.procedures.contains(&proc_id2));
+        assert!(role.procedures.contains(&proc_id3));
 
         let access_key = role.access_key;
         assert_eq!(access_key.len(), 32);
@@ -105,13 +109,11 @@ mod tests {
         let api = auth.read_api_by_name(api_name).await.unwrap();
         let procedure = auth.read_procedure_by_name(api_id1, proc_name).await.unwrap();
         let role = auth.read_role_by_name(api_id1, role_name).await.unwrap();
-        let api_procedure = api.procedures.into_iter().next().unwrap();
 
         assert_eq!(api.name, api_name);
         assert_eq!(api.description, "New resource api");
         assert_eq!(procedure.name, proc_name);
         assert_eq!(procedure.description, "Read resource data");
-        assert_eq!(procedure.id, api_procedure.id);
         assert_eq!(role.name, role_name);
         assert_eq!(role.ip_lock, true);
 
@@ -131,10 +133,10 @@ mod tests {
 
         // get user data
         let users = auth.list_user_by_role(role_id3).await.unwrap();
-        let first_user = users.into_iter().next().unwrap();
+        let user_ids: Vec<Uuid> = users.iter().map(|e| e.id).collect();
         let user = auth.read_user(user_id1).await.unwrap();
 
-        assert_eq!(first_user.id, user_id1);
+        assert!(user_ids.contains(&user_id1));
         assert_eq!(user.name, "administrator");
         assert_eq!(user.email, "admin@mail.co");
         assert_eq!(user.phone, "+6281234567890");
@@ -168,8 +170,8 @@ mod tests {
 
         // get token data
         let access_token = auth.read_access_token(access_id2).await.unwrap();
-        let auth_token = auth.list_auth_token(&auth_token1).await.unwrap()
-            .into_iter().next().unwrap();
+        let auth_tokens = auth.list_auth_token(&auth_token1).await.unwrap();
+        let auth_token = auth_tokens.iter().filter(|x| x.auth_token == auth_token1).next().unwrap();
         let user_tokens = auth.list_token_by_user(user_id1).await.unwrap();
 
         assert_eq!(auth_token.user_id, user_id1);
@@ -185,8 +187,8 @@ mod tests {
 
         // get updated token
         let new_access_token = auth.read_access_token(access_id2).await.unwrap();
-        let new_auth_token = auth.list_auth_token(&auth_token1).await.unwrap()
-            .into_iter().next().unwrap();
+        let new_auth_tokens = auth.list_auth_token(&auth_token1).await.unwrap();
+        let new_auth_token = new_auth_tokens.iter().filter(|x| x.auth_token == auth_token1).next().unwrap();
 
         assert_ne!(new_access_token.refresh_token, access_token.refresh_token);
         assert_eq!(new_access_token.expire, expire3);

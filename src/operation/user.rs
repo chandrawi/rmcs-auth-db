@@ -1,7 +1,8 @@
 use sqlx::{Pool, Row, Error};
 use sqlx::postgres::{Postgres, PgRow};
-use sea_query::{PostgresQueryBuilder, Query, Expr, Order, Func};
+use sea_query::{PostgresQueryBuilder, Query, Expr, Order};
 use sea_query_binder::SqlxBinder;
+use uuid::Uuid;
 
 use crate::schema::auth_user::{User, UserRole, UserSchema, UserRoleSchema};
 use crate::schema::auth_role::Role;
@@ -9,9 +10,9 @@ use crate::schema::api::Api;
 use crate::utility;
 
 enum UserSelector {
-    Id(i32),
+    Id(Uuid),
     Name(String),
-    Role(i32)
+    Role(Uuid)
 }
 
 async fn select_user(pool: &Pool<Postgres>, 
@@ -70,7 +71,7 @@ async fn select_user(pool: &Pool<Postgres>,
         .order_by((UserRole::Table, UserRole::RoleId), Order::Asc)
         .build_sqlx(PostgresQueryBuilder);
 
-    let mut last_id: Option<i32> = None;
+    let mut last_id: Option<Uuid> = None;
     let mut user_schema_vec: Vec<UserSchema> = Vec::new();
 
     sqlx::query_with(&sql, values)
@@ -78,7 +79,7 @@ async fn select_user(pool: &Pool<Postgres>,
             // get last user_schema in user_schema_vec or default
             let mut user_schema = user_schema_vec.pop().unwrap_or_default();
             // on every new user_id found update last_id and insert new user_schema to user_schema_vec
-            let user_id: i32 = row.get(0);
+            let user_id: Uuid = row.get(0);
             if let Some(value) = last_id {
                 if value != user_id {
                     user_schema_vec.push(user_schema.clone());
@@ -116,7 +117,7 @@ async fn select_user(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_user_by_id(pool: &Pool<Postgres>,
-    id: i32
+    id: Uuid
 ) -> Result<UserSchema, Error>
 {
     let users = select_user(pool, UserSelector::Id(id)).await;
@@ -138,7 +139,7 @@ pub(crate) async fn select_user_by_name(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn select_user_by_role(pool: &Pool<Postgres>,
-    role_id: i32
+    role_id: Uuid
 ) -> Result<Vec<UserSchema>, Error>
 {
     select_user(pool, UserSelector::Role(role_id)).await
@@ -149,8 +150,10 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
     email: &str,
     phone: &str,
     password: &str
-) -> Result<i32, Error> 
+) -> Result<Uuid, Error> 
 {
+    let user_id = Uuid::new_v4();
+
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
     let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
@@ -160,6 +163,7 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
     let (sql, values) = Query::insert()
         .into_table(User::Table)
         .columns([
+            User::UserId,
             User::Name,
             User::Password,
             User::PublicKey,
@@ -168,6 +172,7 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
             User::Phone
         ])
         .values([
+            user_id.into(),
             name.into(),
             password_hash.into(),
             pub_der.into(),
@@ -182,20 +187,11 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    let sql = Query::select()
-        .expr(Func::max(Expr::col(User::UserId)))
-        .from(User::Table)
-        .to_string(PostgresQueryBuilder);
-    let id: i32 = sqlx::query(&sql)
-        .map(|row: PgRow| row.get(0))
-        .fetch_one(pool)
-        .await?;
-
-    Ok(id)
+    Ok(user_id)
 }
 
 pub(crate) async fn update_user(pool: &Pool<Postgres>, 
-    id: i32, 
+    id: Uuid, 
     name: Option<&str>, 
     email: Option<&str>,
     phone: Option<&str>,
@@ -242,7 +238,7 @@ pub(crate) async fn update_user(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn delete_user(pool: &Pool<Postgres>, 
-    id: i32
+    id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()
@@ -258,8 +254,8 @@ pub(crate) async fn delete_user(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn add_user_role(pool: &Pool<Postgres>, 
-    id: i32,
-    role_id: i32
+    id: Uuid,
+    role_id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::insert()
@@ -283,8 +279,8 @@ pub(crate) async fn add_user_role(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn remove_user_role(pool: &Pool<Postgres>, 
-    id: i32,
-    role_id: i32
+    id: Uuid,
+    role_id: Uuid
 ) -> Result<(), Error> 
 {
     let (sql, values) = Query::delete()

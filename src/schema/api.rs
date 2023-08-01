@@ -1,4 +1,5 @@
 use sea_query::Iden;
+use uuid::Uuid;
 use rmcs_auth_api::api;
 
 #[allow(unused)]
@@ -28,7 +29,7 @@ pub(crate) enum ApiProcedure {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ApiSchema {
-    pub id: i32,
+    pub id: Uuid,
     pub name: String,
     pub address: String,
     pub category: String,
@@ -42,8 +43,8 @@ pub struct ApiSchema {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ProcedureSchema {
-    pub id: i32,
-    pub api_id: i32,
+    pub id: Uuid,
+    pub api_id: Uuid,
     pub name: String,
     pub description: String,
     pub roles: Vec<String>
@@ -52,7 +53,7 @@ pub struct ProcedureSchema {
 impl From<api::ApiSchema> for ApiSchema {
     fn from(value: api::ApiSchema) -> Self {
         Self {
-            id: value.id,
+            id: Uuid::from_slice(&value.id).unwrap_or_default(),
             name: value.name,
             address: value.address,
             category: value.category,
@@ -69,7 +70,7 @@ impl From<api::ApiSchema> for ApiSchema {
 impl Into<api::ApiSchema> for ApiSchema {
     fn into(self) -> api::ApiSchema {
         api::ApiSchema {
-            id: self.id,
+            id: self.id.as_bytes().to_vec(),
             name: self.name,
             address: self.address,
             category: self.category,
@@ -85,8 +86,8 @@ impl Into<api::ApiSchema> for ApiSchema {
 impl From<api::ProcedureSchema> for ProcedureSchema {
     fn from(value: api::ProcedureSchema) -> Self {
         Self {
-            id: value.id,
-            api_id: value.api_id,
+            id: Uuid::from_slice(&value.id).unwrap_or_default(),
+            api_id: Uuid::from_slice(&value.api_id).unwrap_or_default(),
             name: value.name,
             description: value.description,
             roles: value.roles.into_iter().map(|e| e.into()).collect()
@@ -97,8 +98,8 @@ impl From<api::ProcedureSchema> for ProcedureSchema {
 impl Into<api::ProcedureSchema> for ProcedureSchema {
     fn into(self) -> api::ProcedureSchema {
         api::ProcedureSchema {
-            id: self.id,
-            api_id: self.api_id,
+            id: self.id.as_bytes().to_vec(),
+            api_id: self.api_id.as_bytes().to_vec(),
             name: self.name,
             description: self.description,
             roles: self.roles.into_iter().map(|e| e.into()).collect()

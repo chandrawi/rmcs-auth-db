@@ -1,5 +1,5 @@
 CREATE TABLE "api" (
-  "api_id" serial NOT NULL,
+  "api_id" uuid NOT NULL,
   "name" varchar(64) NOT NULL,
   "address" varchar(128) NOT NULL,
   "category" varchar(64) NOT NULL,
@@ -13,8 +13,8 @@ CREATE TABLE "api" (
 );
 
 CREATE TABLE "api_procedure" (
-  "procedure_id" serial NOT NULL,
-  "api_id" int NOT NULL,
+  "procedure_id" uuid NOT NULL,
+  "api_id" uuid NOT NULL,
   "name" varchar(64) NOT NULL,
   "description" varchar(255) NOT NULL,
   PRIMARY KEY ("procedure_id"),

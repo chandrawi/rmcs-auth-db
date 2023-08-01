@@ -1,6 +1,6 @@
 CREATE TABLE "token" (
   "access_id" int NOT NULL,
-  "user_id" int NOT NULL DEFAULT 0,
+  "user_id" uuid NOT NULL,
   "refresh_token" char(32) NOT NULL,
   "auth_token" char(32) NOT NULL,
   "expire" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

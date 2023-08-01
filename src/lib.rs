@@ -5,6 +5,7 @@ pub(crate) mod utility;
 use sqlx::{Pool, Error};
 use sqlx::postgres::{Postgres, PgPoolOptions};
 use sqlx::types::chrono::NaiveDateTime;
+use uuid::Uuid;
 
 pub use schema::api::{ApiSchema, ProcedureSchema};
 pub use schema::auth_role::RoleSchema;
@@ -84,7 +85,7 @@ impl Auth {
         self.options.order = order;
     }
 
-    pub async fn read_api(&self, id: i32)
+    pub async fn read_api(&self, id: Uuid)
         -> Result<ApiSchema, Error>
     {
         api::select_api_by_id(&self.pool, id)
@@ -105,132 +106,132 @@ impl Auth {
     }
 
     pub async fn create_api(&self, name: &str, address: &str, category: &str, description: &str, password: &str)
-        -> Result<i32, Error>
+        -> Result<Uuid, Error>
     {
         api::insert_api(&self.pool, name, address, category, description, password)
         .await
     }
 
-    pub async fn update_api(&self, id: i32, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>, password: Option<&str>, keys: Option<()>)
+    pub async fn update_api(&self, id: Uuid, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>, password: Option<&str>, keys: Option<()>)
         -> Result<(), Error>
     {
         api::update_api(&self.pool, id, name, address, category, description, password, keys)
         .await
     }
 
-    pub async fn delete_api(&self, id: i32)
+    pub async fn delete_api(&self, id: Uuid)
         -> Result<(), Error>
     {
         api::delete_api(&self.pool, id)
         .await
     }
 
-    pub async fn read_procedure(&self, id: i32)
+    pub async fn read_procedure(&self, id: Uuid)
         -> Result<ProcedureSchema, Error>
     {
         api::select_procedure_by_id(&self.pool, id)
         .await
     }
 
-    pub async fn read_procedure_by_name(&self, api_id: i32, name: &str)
+    pub async fn read_procedure_by_name(&self, api_id: Uuid, name: &str)
         -> Result<ProcedureSchema, Error>
     {
         api::select_procedure_by_name(&self.pool, api_id, name)
         .await
     }
 
-    pub async fn list_procedure_by_api(&self, api_id: i32)
+    pub async fn list_procedure_by_api(&self, api_id: Uuid)
         -> Result<Vec<ProcedureSchema>, Error>
     {
         api::select_procedure_by_api(&self.pool, api_id)
         .await
     }
 
-    pub async fn create_procedure(&self, api_id: i32, name: &str, description: &str)
-        -> Result<i32, Error>
+    pub async fn create_procedure(&self, api_id: Uuid, name: &str, description: &str)
+        -> Result<Uuid, Error>
     {
         api::insert_procedure(&self.pool, api_id, name, description)
         .await
     }
 
-    pub async fn update_procedure(&self, id: i32, name: Option<&str>, description: Option<&str>)
+    pub async fn update_procedure(&self, id: Uuid, name: Option<&str>, description: Option<&str>)
         -> Result<(), Error>
     {
         api::update_procedure(&self.pool, id, name, description)
         .await
     }
 
-    pub async fn delete_procedure(&self, id: i32)
+    pub async fn delete_procedure(&self, id: Uuid)
         -> Result<(), Error>
     {
         api::delete_procedure(&self.pool, id)
         .await
     }
 
-    pub async fn read_role(&self, id: i32)
+    pub async fn read_role(&self, id: Uuid)
         -> Result<RoleSchema, Error>
     {
         role::select_role_by_id(&self.pool, id)
         .await
     }
 
-    pub async fn read_role_by_name(&self, api_id: i32, name: &str)
+    pub async fn read_role_by_name(&self, api_id: Uuid, name: &str)
         -> Result<RoleSchema, Error>
     {
         role::select_role_by_name(&self.pool, api_id, name)
         .await
     }
 
-    pub async fn list_role_by_api(&self, api_id: i32)
+    pub async fn list_role_by_api(&self, api_id: Uuid)
         -> Result<Vec<RoleSchema>, Error>
     {
         role::select_role_by_api(&self.pool, api_id)
         .await
     }
 
-    pub async fn list_role_by_user(&self, user_id: i32)
+    pub async fn list_role_by_user(&self, user_id: Uuid)
         -> Result<Vec<RoleSchema>, Error>
     {
         role::select_role_by_user(&self.pool, user_id)
         .await
     }
 
-    pub async fn create_role(&self, api_id: i32, name: &str, multi: bool, ip_lock: bool, access_duration: i32, refresh_duration: i32)
-        -> Result<i32, Error>
+    pub async fn create_role(&self, api_id: Uuid, name: &str, multi: bool, ip_lock: bool, access_duration: i32, refresh_duration: i32)
+        -> Result<Uuid, Error>
     {
         role::insert_role(&self.pool, api_id, name, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 
-    pub async fn update_role(&self, id: i32, name: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<i32>, refresh_duration: Option<i32>)
+    pub async fn update_role(&self, id: Uuid, name: Option<&str>, multi: Option<bool>, ip_lock: Option<bool>, access_duration: Option<i32>, refresh_duration: Option<i32>)
         -> Result<(), Error>
     {
         role::update_role(&self.pool, id, name, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 
-    pub async fn delete_role(&self, id: i32)
+    pub async fn delete_role(&self, id: Uuid)
         -> Result<(), Error>
     {
         role::delete_role(&self.pool, id)
         .await
     }
 
-    pub async fn add_role_access(&self, id: i32, procedure_id: i32)
+    pub async fn add_role_access(&self, id: Uuid, procedure_id: Uuid)
         -> Result<(), Error>
     {
         role::add_role_access(&self.pool, id, procedure_id)
         .await
     }
 
-    pub async fn remove_role_access(&self, id: i32, procedure_id: i32)
+    pub async fn remove_role_access(&self, id: Uuid, procedure_id: Uuid)
         -> Result<(), Error>
     {
         role::remove_role_access(&self.pool, id, procedure_id)
         .await
     }
 
-    pub async fn read_user(&self, id: i32)
+    pub async fn read_user(&self, id: Uuid)
         -> Result<UserSchema, Error>
     {
         user::select_user_by_id(&self.pool, id)
@@ -244,7 +245,7 @@ impl Auth {
         .await
     }
 
-    pub async fn list_user_by_role(&self, role_id: i32)
+    pub async fn list_user_by_role(&self, role_id: Uuid)
         -> Result<Vec<UserSchema>, Error>
     {
         user::select_user_by_role(&self.pool, role_id)
@@ -252,34 +253,34 @@ impl Auth {
     }
 
     pub async fn create_user(&self, name: &str, email: &str, phone: &str, password: &str)
-        -> Result<i32, Error>
+        -> Result<Uuid, Error>
     {
         user::insert_user(&self.pool, name, email, phone, password)
         .await
     }
 
-    pub async fn update_user(&self, id: i32, name: Option<&str>, email: Option<&str>, phone: Option<&str>, password: Option<&str>, keys: Option<()>)
+    pub async fn update_user(&self, id: Uuid, name: Option<&str>, email: Option<&str>, phone: Option<&str>, password: Option<&str>, keys: Option<()>)
         -> Result<(), Error>
     {
         user::update_user(&self.pool, id, name, email, phone, password, keys)
         .await
     }
 
-    pub async fn delete_user(&self, id: i32)
+    pub async fn delete_user(&self, id: Uuid)
         -> Result<(), Error>
     {
         user::delete_user(&self.pool, id)
         .await
     }
 
-    pub async fn add_user_role(&self, id: i32, role_id: i32)
+    pub async fn add_user_role(&self, id: Uuid, role_id: Uuid)
         -> Result<(), Error>
     {
         user::add_user_role(&self.pool, id, role_id)
         .await
     }
 
-    pub async fn remove_user_role(&self, id: i32, role_id: i32)
+    pub async fn remove_user_role(&self, id: Uuid, role_id: Uuid)
         -> Result<(), Error>
     {
         user::remove_user_role(&self.pool, id, role_id)
@@ -300,21 +301,21 @@ impl Auth {
         .await
     }
 
-    pub async fn list_token_by_user(&self, user_id: i32)
+    pub async fn list_token_by_user(&self, user_id: Uuid)
         -> Result<Vec<TokenSchema>, Error>
     {
         token::select_token_by_user(&self.pool, user_id)
         .await
     }
 
-    pub async fn create_access_token(&self, user_id: i32, auth_token: &str, expire: NaiveDateTime, ip: &[u8])
+    pub async fn create_access_token(&self, user_id: Uuid, auth_token: &str, expire: NaiveDateTime, ip: &[u8])
         -> Result<(i32, String, String), Error>
     {
         token::insert_token(&self.pool, user_id, Some(auth_token), expire, ip, 1)
         .await?.into_iter().next().ok_or(Error::RowNotFound)
     }
 
-    pub async fn create_auth_token(&self, user_id: i32, expire: NaiveDateTime, ip: &[u8], number: u32)
+    pub async fn create_auth_token(&self, user_id: Uuid, expire: NaiveDateTime, ip: &[u8], number: u32)
         -> Result<Vec<(i32, String, String)>, Error>
     {
         token::insert_token(&self.pool, user_id, None, expire, ip, number)
@@ -349,7 +350,7 @@ impl Auth {
         .await
     }
 
-    pub async fn delete_token_by_user(&self, user_id: i32)
+    pub async fn delete_token_by_user(&self, user_id: Uuid)
         -> Result<(), Error>
     {
         token::delete_token_by_user(&self.pool, user_id)
