@@ -5,8 +5,6 @@ CREATE TABLE "api" (
   "category" varchar(64) NOT NULL,
   "description" varchar(255) NOT NULL,
   "password" varchar(128) NOT NULL,
-  "public_key" bytea NOT NULL,
-  "private_key" bytea NOT NULL,
   "access_key" bytea NOT NULL,
   PRIMARY KEY ("api_id"),
   UNIQUE ("name")

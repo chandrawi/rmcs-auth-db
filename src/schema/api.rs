@@ -12,8 +12,6 @@ pub(crate) enum Api {
     Category,
     Description,
     Password,
-    PublicKey,
-    PrivateKey,
     AccessKey
 }
 
@@ -34,8 +32,6 @@ pub struct ApiSchema {
     pub address: String,
     pub category: String,
     pub description: String,
-    pub public_key: Vec<u8>,
-    pub private_key: Vec<u8>,
     pub password: String,
     pub access_key: Vec<u8>,
     pub procedures: Vec<ProcedureSchema>,
@@ -58,8 +54,6 @@ impl From<api::ApiSchema> for ApiSchema {
             address: value.address,
             category: value.category,
             description: value.description,
-            public_key: value.public_key,
-            private_key: Vec::new(),
             password: value.password,
             access_key: value.access_key,
             procedures: value.procedures.into_iter().map(|e| e.into()).collect()
@@ -75,7 +69,6 @@ impl Into<api::ApiSchema> for ApiSchema {
             address: self.address,
             category: self.category,
             description: self.description,
-            public_key: self.public_key,
             password: self.password,
             access_key: self.access_key,
             procedures: self.procedures.into_iter().map(|e| e.into()).collect()

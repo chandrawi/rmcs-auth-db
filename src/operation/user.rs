@@ -24,8 +24,6 @@ async fn select_user(pool: &Pool<Postgres>,
             (User::Table, User::UserId),
             (User::Table, User::Name),
             (User::Table, User::Password),
-            (User::Table, User::PublicKey),
-            (User::Table, User::PrivateKey),
             (User::Table, User::Email),
             (User::Table, User::Phone)
         ])
@@ -90,21 +88,19 @@ async fn select_user(pool: &Pool<Postgres>,
             user_schema.id = user_id;
             user_schema.name = row.get(1);
             user_schema.password = row.get(2);
-            user_schema.public_key = row.get(3);
-            user_schema.private_key = row.get(4);
-            user_schema.email = row.get(5);
-            user_schema.phone = row.get(6);
+            user_schema.email = row.get(3);
+            user_schema.phone = row.get(4);
             // on every new role_id found add a role to user_schema
-            let role_name = row.try_get(8).ok();
+            let role_name = row.try_get(6).ok();
             if let Some(name) = role_name {
                 user_schema.roles.push(UserRoleSchema {
-                    api_id: row.get(7),
+                    api_id: row.get(5),
                     role: name,
-                    multi: row.get(9),
-                    ip_lock: row.get(10),
-                    access_duration: row.get(11),
-                    refresh_duration: row.get(12),
-                    access_key: row.get(13)
+                    multi: row.get(7),
+                    ip_lock: row.get(8),
+                    access_duration: row.get(9),
+                    refresh_duration: row.get(10),
+                    access_key: row.get(11)
                 });
             }
             // update api_schema_vec with updated user_schema
@@ -156,18 +152,12 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
 
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
-    let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
-    let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-    let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
-
     let (sql, values) = Query::insert()
         .into_table(User::Table)
         .columns([
             User::UserId,
             User::Name,
             User::Password,
-            User::PublicKey,
-            User::PrivateKey,
             User::Email,
             User::Phone
         ])
@@ -175,8 +165,6 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
             user_id.into(),
             name.into(),
             password_hash.into(),
-            pub_der.into(),
-            priv_der.into(),
             email.into(),
             phone.into()
         ])
@@ -195,8 +183,7 @@ pub(crate) async fn update_user(pool: &Pool<Postgres>,
     name: Option<&str>, 
     email: Option<&str>,
     phone: Option<&str>,
-    password: Option<&str>, 
-    keys: Option<()>
+    password: Option<&str>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -215,15 +202,6 @@ pub(crate) async fn update_user(pool: &Pool<Postgres>,
     if let Some(value) = password {
         let password_hash = utility::hash_password(value).or(Err(Error::WorkerCrashed))?;
         stmt = stmt.value(User::Password, password_hash).to_owned();
-    }
-    if let Some(_) = keys {
-        let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
-        let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-        let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
-        stmt = stmt
-            .value(User::PublicKey, pub_der)
-            .value(User::PrivateKey, priv_der)
-            .to_owned();
     }
 
     let (sql, values) = stmt

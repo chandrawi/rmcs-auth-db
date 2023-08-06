@@ -8,8 +8,6 @@ pub(crate) enum User {
     UserId,
     Name,
     Password,
-    PublicKey,
-    PrivateKey,
     Email,
     Phone
 }
@@ -27,8 +25,6 @@ pub struct UserSchema {
     pub name: String,
     pub email: String,
     pub phone: String,
-    pub public_key: Vec<u8>,
-    pub private_key: Vec<u8>,
     pub password: String,
     pub roles: Vec<UserRoleSchema>
 }
@@ -51,8 +47,6 @@ impl From<user::UserSchema> for UserSchema {
             name: value.name,
             email: value.email,
             phone: value.phone,
-            public_key: value.public_key,
-            private_key: Vec::new(),
             password: value.password,
             roles: value.roles.into_iter().map(|e| e.into()).collect()
         }
@@ -66,7 +60,6 @@ impl Into<user::UserSchema> for UserSchema {
             name: self.name,
             email: self.email,
             phone: self.phone,
-            public_key: self.public_key,
             password: self.password,
             roles: self.roles.into_iter().map(|e| e.into()).collect()
         }

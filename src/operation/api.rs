@@ -32,8 +32,6 @@ async fn select_api(pool: &Pool<Postgres>,
             (Api::Table, Api::Category),
             (Api::Table, Api::Description),
             (Api::Table, Api::Password),
-            (Api::Table, Api::PublicKey),
-            (Api::Table, Api::PrivateKey),
             (Api::Table, Api::AccessKey)
         ])
         .columns([
@@ -101,26 +99,24 @@ async fn select_api(pool: &Pool<Postgres>,
             api_schema.category = row.get(3);
             api_schema.description = row.get(4);
             api_schema.password = row.get(5);
-            api_schema.public_key = row.get(6);
-            api_schema.private_key = row.get(7);
-            api_schema.access_key = row.get(8);
+            api_schema.access_key = row.get(6);
             // on every new procedure_id found add a procedure to api_schema
-            let procedure_id = row.try_get(9).ok();
-            let procedure_name: String = row.try_get(10).unwrap_or_default();
+            let procedure_id = row.try_get(7).ok();
+            let procedure_name: String = row.try_get(8).unwrap_or_default();
             if last_procedure == None || last_procedure != procedure_id {
                 if let Some(id) = procedure_id {
                     api_schema.procedures.push(ProcedureSchema {
                         id,
                         api_id,
                         name: procedure_name.clone(),
-                        description: row.get(11),
+                        description: row.get(9),
                         roles: Vec::new()
                     });
                 }
             }
             last_procedure = procedure_id;
             // add role to api_schema procedures
-            let role_name: Result<String, _> = row.try_get(12);
+            let role_name: Result<String, _> = row.try_get(10);
             if let Ok(name) = role_name {
                 let mut procedure_schema = api_schema.procedures.pop().unwrap_or_default();
                 procedure_schema.roles.push(name.clone());
@@ -171,10 +167,6 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
 
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
-    let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
-    let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-    let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
-
     let access_key = utility::generate_random_bytes(32);
 
     let (sql, values) = Query::insert()
@@ -186,8 +178,6 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
             Api::Category,
             Api::Description,
             Api::Password,
-            Api::PublicKey,
-            Api::PrivateKey,
             Api::AccessKey
         ])
         .values([
@@ -197,8 +187,6 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
             category.into(),
             description.into(),
             password_hash.into(),
-            pub_der.into(),
-            priv_der.into(),
             access_key.into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
@@ -218,7 +206,7 @@ pub(crate) async fn update_api(pool: &Pool<Postgres>,
     category: Option<&str>, 
     description: Option<&str>,
     password: Option<&str>,
-    keys: Option<()>
+    access_key: Option<()>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -241,14 +229,9 @@ pub(crate) async fn update_api(pool: &Pool<Postgres>,
     if let Some(value) = description {
         stmt = stmt.value(Api::Description, value).to_owned();
     }
-    if let Some(_) = keys {
-        let (priv_key, pub_key) = utility::generate_keys().or(Err(Error::WorkerCrashed))?;
-        let priv_der = utility::export_private_key(priv_key).or(Err(Error::WorkerCrashed))?;
-        let pub_der = utility::export_public_key(pub_key).or(Err(Error::WorkerCrashed))?;
+    if let Some(_) = access_key {
         let access_key = utility::generate_random_bytes(32);
         stmt = stmt
-            .value(Api::PublicKey, pub_der)
-            .value(Api::PrivateKey, priv_der)
             .value(Api::AccessKey, access_key)
             .to_owned();
     }

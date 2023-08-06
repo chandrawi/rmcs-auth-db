@@ -64,9 +64,6 @@ mod tests {
         assert!(proc_ids.contains(&proc_id1));
         assert_eq!(api_proc_ids, proc_ids);
 
-        let (pub_key, priv_key) = (api.public_key, api.private_key);
-        assert!(pub_key.len() > 64);
-        assert!(priv_key.len() > 64);
         let hash = api.password;
         let parsed_hash = PasswordHash::new(hash.as_str()).unwrap();
         assert!(Argon2::default().verify_password(password_api.as_bytes(), &parsed_hash).is_ok());
@@ -116,9 +113,6 @@ mod tests {
         assert_eq!(procedure.description, "Read resource data");
         assert_eq!(role.name, role_name);
         assert_eq!(role.ip_lock, true);
-
-        assert_ne!(api.public_key, pub_key);
-        assert_ne!(api.private_key, priv_key);
         assert_ne!(role.access_key, access_key);
 
         // create new user and add associated roles
@@ -141,23 +135,18 @@ mod tests {
         assert_eq!(user.email, "admin@mail.co");
         assert_eq!(user.phone, "+6281234567890");
 
-        let (pub_key, priv_key) = (user.public_key, user.private_key);
-        assert!(pub_key.len() > 64);
-        assert!(priv_key.len() > 64);
         let hash = user.password;
         let parsed_hash = PasswordHash::new(hash.as_str()).unwrap();
         assert!(Argon2::default().verify_password(password_admin.as_bytes(), &parsed_hash).is_ok());
 
         // update user
         let password_new = "N3w_P4s5w0rd";
-        auth.update_user(user_id2, None, None, None, Some(password_new), Some(())).await.unwrap();
+        auth.update_user(user_id2, None, None, None, Some(password_new)).await.unwrap();
 
         // get updated user
         let user = auth.read_user_by_name("username").await.unwrap();
 
         assert_ne!(user.password, hash);
-        assert_ne!(user.public_key, pub_key);
-        assert_ne!(user.private_key, priv_key);
 
         // create new access token and refresh token
         let expire1 = NaiveDateTime::parse_from_str("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
