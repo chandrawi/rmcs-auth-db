@@ -6,6 +6,7 @@ mod tests {
     use uuid::Uuid;
     use argon2::{Argon2, PasswordHash, PasswordVerifier};
     use rmcs_auth_db::Auth;
+    use rmcs_auth_db::utility::generate_access_key;
 
     async fn get_connection_pool() -> Result<Pool<Postgres>, Error>
     {
@@ -29,7 +30,7 @@ mod tests {
     #[sqlx::test]
     async fn test_auth()
     {
-        std::env::set_var("RUST_BACKTRACE", "1");
+        // std::env::set_var("RUST_BACKTRACE", "1");
 
         let pool = get_connection_pool().await.unwrap();
         let auth = Auth::new_with_pool(pool);
@@ -39,8 +40,9 @@ mod tests {
 
         // create new resource API
         let password_api = "Ap1_P4s5w0rd";
-        let api_id1 = auth.create_api("Resource1", "localhost:9001", "RESOURCE", "", password_api).await.unwrap();
-        let api_id2 = auth.create_api("Resource_2", "localhost:9002", "RESOURCE", "",  password_api).await.unwrap();
+        let access_key = generate_access_key();
+        let api_id1 = auth.create_api("Resource1", "localhost:9001", "RESOURCE", "", password_api, &access_key).await.unwrap();
+        let api_id2 = auth.create_api("Resource_2", "localhost:9002", "RESOURCE", "",  password_api, &access_key).await.unwrap();
 
         // create new procedure for newly created resource API
         let proc_id1 = auth.create_procedure(api_id1, "ReadResourceData", "").await.unwrap();
@@ -98,7 +100,8 @@ mod tests {
         let api_name = "Resource_1";
         let proc_name = "ReadData";
         let role_name = "admin";
-        auth.update_api(api_id1, Some(api_name), None, None, Some("New resource api"), None, Some(())).await.unwrap();
+        let access_key_new = generate_access_key();
+        auth.update_api(api_id1, Some(api_name), None, None, Some("New resource api"), None, Some(&access_key_new)).await.unwrap();
         auth.update_procedure(proc_id1, Some(proc_name), Some("Read resource data")).await.unwrap();
         auth.update_role(role_id1, Some(role_name), None, Some(true), None, None).await.unwrap();
 

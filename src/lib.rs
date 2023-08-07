@@ -1,6 +1,6 @@
 pub mod schema;
 pub(crate) mod operation;
-pub(crate) mod utility;
+pub mod utility;
 
 use sqlx::{Pool, Error};
 use sqlx::postgres::{Postgres, PgPoolOptions};
@@ -105,14 +105,14 @@ impl Auth {
         api::select_api_by_category(&self.pool, category).await
     }
 
-    pub async fn create_api(&self, name: &str, address: &str, category: &str, description: &str, password: &str)
+    pub async fn create_api(&self, name: &str, address: &str, category: &str, description: &str, password: &str, access_key: &[u8])
         -> Result<Uuid, Error>
     {
-        api::insert_api(&self.pool, name, address, category, description, password)
+        api::insert_api(&self.pool, name, address, category, description, password, access_key)
         .await
     }
 
-    pub async fn update_api(&self, id: Uuid, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>, password: Option<&str>, access_key: Option<()>)
+    pub async fn update_api(&self, id: Uuid, name: Option<&str>, address: Option<&str>, category: Option<&str>, description: Option<&str>, password: Option<&str>, access_key: Option<&[u8]>)
         -> Result<(), Error>
     {
         api::update_api(&self.pool, id, name, address, category, description, password, access_key)

@@ -107,11 +107,11 @@ pub(crate) async fn insert_token(pool: &Pool<Postgres>,
 
     let auth_token = match auth_token {
         Some(value) => value.to_owned(),
-        None => utility::generate_random_base64(32)
+        None => utility::generate_token_string()
     };
     let gens: Vec<(i32, String, String)> = (0..number).map(|_| {
         access_id = if access_id < i32::MAX { access_id + 1 } else { 1 };
-        let refresh_token = utility::generate_random_base64(32);
+        let refresh_token = utility::generate_token_string();
         (access_id, refresh_token, auth_token.clone())
     })
     .collect();
@@ -155,10 +155,10 @@ pub(crate) async fn update_token(pool: &Pool<Postgres>,
     ip: Option<&[u8]>
 ) -> Result<(String, String), Error> 
 {
-    let refresh_token = utility::generate_random_base64(32);
+    let refresh_token = utility::generate_token_string();
     let (auth_token, flag) = match auth_token {
         Some(value) => (value.to_owned(), true),
-        None => (utility::generate_random_base64(32), false)
+        None => (utility::generate_token_string(), false)
     };
 
     let mut stmt = Query::update()

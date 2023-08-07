@@ -160,14 +160,13 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
     address: &str, 
     category: &str, 
     description: &str,
-    password: &str
+    password: &str,
+    access_key: &[u8]
 ) -> Result<Uuid, Error> 
 {
     let api_id = Uuid::new_v4();
 
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
-
-    let access_key = utility::generate_random_bytes(32);
 
     let (sql, values) = Query::insert()
         .into_table(Api::Table)
@@ -187,7 +186,7 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
             category.into(),
             description.into(),
             password_hash.into(),
-            access_key.into()
+            access_key.to_vec().into()
         ])
         .unwrap_or(&mut sea_query::InsertStatement::default())
         .build_sqlx(PostgresQueryBuilder);
@@ -206,7 +205,7 @@ pub(crate) async fn update_api(pool: &Pool<Postgres>,
     category: Option<&str>, 
     description: Option<&str>,
     password: Option<&str>,
-    access_key: Option<()>
+    access_key: Option<&[u8]>
 ) -> Result<(), Error> 
 {
     let mut stmt = Query::update()
@@ -229,10 +228,9 @@ pub(crate) async fn update_api(pool: &Pool<Postgres>,
     if let Some(value) = description {
         stmt = stmt.value(Api::Description, value).to_owned();
     }
-    if let Some(_) = access_key {
-        let access_key = utility::generate_random_bytes(32);
+    if let Some(value) = access_key {
         stmt = stmt
-            .value(Api::AccessKey, access_key)
+            .value(Api::AccessKey, value.to_vec())
             .to_owned();
     }
 
