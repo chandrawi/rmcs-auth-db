@@ -1,4 +1,4 @@
-CREATE TABLE "role" (
+CREATE TABLE IF NOT EXISTS "role" (
   "role_id" uuid NOT NULL,
   "api_id" uuid NOT NULL,
   "name" varchar(64) NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE "role" (
     REFERENCES "api" ("api_id")
 );
 
-CREATE TABLE "role_access" (
+CREATE TABLE IF NOT EXISTS "role_access" (
   "role_id" uuid NOT NULL,
   "procedure_id" uuid NOT NULL,
   PRIMARY KEY ("role_id","procedure_id"),

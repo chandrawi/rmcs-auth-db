@@ -1,4 +1,4 @@
-CREATE TABLE "user" (
+CREATE TABLE IF NOT EXISTS "user" (
   "user_id" uuid NOT NULL,
   "name" varchar(64) NOT NULL,
   "email" varchar(128) NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE "user" (
   UNIQUE ("name")
 );
 
-CREATE TABLE "user_role" (
+CREATE TABLE IF NOT EXISTS "user_role" (
   "user_id" uuid NOT NULL,
   "role_id" uuid NOT NULL,
   PRIMARY KEY ("user_id","role_id"),

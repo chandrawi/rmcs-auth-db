@@ -1,4 +1,4 @@
-CREATE TABLE "token" (
+CREATE TABLE IF NOT EXISTS "token" (
   "access_id" int NOT NULL,
   "user_id" uuid NOT NULL,
   "refresh_token" char(32) NOT NULL,
