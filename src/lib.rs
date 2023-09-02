@@ -4,7 +4,7 @@ pub mod utility;
 
 use sqlx::{Pool, Error};
 use sqlx::postgres::{Postgres, PgPoolOptions};
-use sqlx::types::chrono::NaiveDateTime;
+use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 pub use schema::api::{ApiSchema, ProcedureSchema};
@@ -308,28 +308,28 @@ impl Auth {
         .await
     }
 
-    pub async fn create_access_token(&self, user_id: Uuid, auth_token: &str, expire: NaiveDateTime, ip: &[u8])
+    pub async fn create_access_token(&self, user_id: Uuid, auth_token: &str, expire: DateTime<Utc>, ip: &[u8])
         -> Result<(i32, String, String), Error>
     {
         token::insert_token(&self.pool, user_id, Some(auth_token), expire, ip, 1)
         .await?.into_iter().next().ok_or(Error::RowNotFound)
     }
 
-    pub async fn create_auth_token(&self, user_id: Uuid, expire: NaiveDateTime, ip: &[u8], number: u32)
+    pub async fn create_auth_token(&self, user_id: Uuid, expire: DateTime<Utc>, ip: &[u8], number: u32)
         -> Result<Vec<(i32, String, String)>, Error>
     {
         token::insert_token(&self.pool, user_id, None, expire, ip, number)
         .await
     }
 
-    pub async fn update_access_token(&self, access_id: i32, expire: Option<NaiveDateTime>, ip: Option<&[u8]>)
+    pub async fn update_access_token(&self, access_id: i32, expire: Option<DateTime<Utc>>, ip: Option<&[u8]>)
         -> Result<(String, String), Error>
     {
         token::update_token(&self.pool, Some(access_id), None, expire, ip)
         .await
     }
 
-    pub async fn update_auth_token(&self, auth_token: &str, expire: Option<NaiveDateTime>, ip: Option<&[u8]>)
+    pub async fn update_auth_token(&self, auth_token: &str, expire: Option<DateTime<Utc>>, ip: Option<&[u8]>)
         -> Result<(String, String), Error>
     {
         token::update_token(&self.pool, None, Some(auth_token), expire, ip)

@@ -2,7 +2,7 @@
 mod tests {
     use sqlx::{Pool, Error};
     use sqlx::postgres::{Postgres, PgPoolOptions};
-    use sqlx::types::chrono::NaiveDateTime;
+    use sqlx::types::chrono::DateTime;
     use uuid::Uuid;
     use argon2::{Argon2, PasswordHash, PasswordVerifier};
     use rmcs_auth_db::Auth;
@@ -152,8 +152,8 @@ mod tests {
         assert_ne!(user.password, hash);
 
         // create new access token and refresh token
-        let expire1 = NaiveDateTime::parse_from_str("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-        let expire2 = NaiveDateTime::parse_from_str("2023-01-01 12:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let expire1 = DateTime::parse_from_str("2023-01-01 00:00:00 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap().into();
+        let expire2 = DateTime::parse_from_str("2023-01-01 12:00:00 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap().into();
         let auth_token = "rGKrHrDuWXt2CDbjmrt1SHbmea86wIQb";
         let (access_id1, _, auth_token1) = auth.create_access_token(user_id1, auth_token, expire1, &[192, 168, 0, 1]).await.unwrap();
         let access_id2 = access_id1 + 1;
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(user_tokens.len(), 3);
 
         // update token
-        let expire3 = NaiveDateTime::parse_from_str("2023-01-01 18:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let expire3 = DateTime::parse_from_str("2023-01-01 18:00:00 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap().into();
         auth.update_access_token(access_id2, Some(expire3), None).await.unwrap();
         auth.update_auth_token(&auth_token1, Some(expire3), Some(&[192, 168, 0, 100])).await.unwrap();
 
