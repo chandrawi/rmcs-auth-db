@@ -105,10 +105,10 @@ impl Auth {
         api::select_api_by_category(&self.pool, category).await
     }
 
-    pub async fn create_api(&self, name: &str, address: &str, category: &str, description: &str, password: &str, access_key: &[u8])
+    pub async fn create_api(&self, id: Uuid, name: &str, address: &str, category: &str, description: &str, password: &str, access_key: &[u8])
         -> Result<Uuid, Error>
     {
-        api::insert_api(&self.pool, name, address, category, description, password, access_key)
+        api::insert_api(&self.pool, id, name, address, category, description, password, access_key)
         .await
     }
 
@@ -147,10 +147,10 @@ impl Auth {
         .await
     }
 
-    pub async fn create_procedure(&self, api_id: Uuid, name: &str, description: &str)
+    pub async fn create_procedure(&self, id: Uuid, api_id: Uuid, name: &str, description: &str)
         -> Result<Uuid, Error>
     {
-        api::insert_procedure(&self.pool, api_id, name, description)
+        api::insert_procedure(&self.pool, id, api_id, name, description)
         .await
     }
 
@@ -196,10 +196,10 @@ impl Auth {
         .await
     }
 
-    pub async fn create_role(&self, api_id: Uuid, name: &str, multi: bool, ip_lock: bool, access_duration: i32, refresh_duration: i32)
+    pub async fn create_role(&self, id: Uuid, api_id: Uuid, name: &str, multi: bool, ip_lock: bool, access_duration: i32, refresh_duration: i32)
         -> Result<Uuid, Error>
     {
-        role::insert_role(&self.pool, api_id, name, multi, ip_lock, access_duration, refresh_duration)
+        role::insert_role(&self.pool, id, api_id, name, multi, ip_lock, access_duration, refresh_duration)
         .await
     }
 
@@ -252,10 +252,10 @@ impl Auth {
         .await
     }
 
-    pub async fn create_user(&self, name: &str, email: &str, phone: &str, password: &str)
+    pub async fn create_user(&self, id: Uuid, name: &str, email: &str, phone: &str, password: &str)
         -> Result<Uuid, Error>
     {
-        user::insert_user(&self.pool, name, email, phone, password)
+        user::insert_user(&self.pool, id, name, email, phone, password)
         .await
     }
 

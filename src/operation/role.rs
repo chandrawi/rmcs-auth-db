@@ -147,6 +147,7 @@ pub(crate) async fn select_role_by_user(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn insert_role(pool: &Pool<Postgres>, 
+    id: Uuid,
     api_id: Uuid,
     name: &str, 
     multi: bool, 
@@ -155,8 +156,6 @@ pub(crate) async fn insert_role(pool: &Pool<Postgres>,
     refresh_duration: i32,
 ) -> Result<Uuid, Error> 
 {
-    let role_id = Uuid::new_v4();
-
     let (sql, values) = Query::insert()
         .into_table(Role::Table)
         .columns([
@@ -169,7 +168,7 @@ pub(crate) async fn insert_role(pool: &Pool<Postgres>,
             Role::RefreshDuration
         ])
         .values([
-            role_id.into(),
+            id.into(),
             api_id.into(),
             name.into(),
             multi.into(),
@@ -184,7 +183,7 @@ pub(crate) async fn insert_role(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    Ok(role_id)
+    Ok(id)
 }
 
 pub(crate) async fn update_role(pool: &Pool<Postgres>, 

@@ -41,14 +41,14 @@ mod tests {
         // create new resource API
         let password_api = "Ap1_P4s5w0rd";
         let access_key = generate_access_key();
-        let api_id1 = auth.create_api("Resource1", "localhost:9001", "RESOURCE", "", password_api, &access_key).await.unwrap();
-        let api_id2 = auth.create_api("Resource_2", "localhost:9002", "RESOURCE", "",  password_api, &access_key).await.unwrap();
+        let api_id1 = auth.create_api(Uuid::new_v4(), "Resource1", "localhost:9001", "RESOURCE", "", password_api, &access_key).await.unwrap();
+        let api_id2 = auth.create_api(Uuid::new_v4(), "Resource_2", "localhost:9002", "RESOURCE", "",  password_api, &access_key).await.unwrap();
 
         // create new procedure for newly created resource API
-        let proc_id1 = auth.create_procedure(api_id1, "ReadResourceData", "").await.unwrap();
-        let proc_id2 = auth.create_procedure(api_id1, "CreateData", "").await.unwrap();
-        let proc_id3 = auth.create_procedure(api_id1, "DeleteData", "").await.unwrap();
-        let proc_id4 = auth.create_procedure(api_id2, "ReadConfig", "").await.unwrap();
+        let proc_id1 = auth.create_procedure(Uuid::new_v4(), api_id1, "ReadResourceData", "").await.unwrap();
+        let proc_id2 = auth.create_procedure(Uuid::new_v4(), api_id1, "CreateData", "").await.unwrap();
+        let proc_id3 = auth.create_procedure(Uuid::new_v4(), api_id1, "DeleteData", "").await.unwrap();
+        let proc_id4 = auth.create_procedure(Uuid::new_v4(), api_id2, "ReadConfig", "").await.unwrap();
 
         // get newly created resource at the first of resource API list
         let apis = auth.list_api_by_category("RESOURCE").await.unwrap();
@@ -71,13 +71,13 @@ mod tests {
         assert!(Argon2::default().verify_password(password_api.as_bytes(), &parsed_hash).is_ok());
 
         // create new role and add access to the procedure
-        let role_id1 = auth.create_role(api_id1, "administrator", false, false, 900, 28800).await.unwrap();
+        let role_id1 = auth.create_role(Uuid::new_v4(), api_id1, "administrator", false, false, 900, 28800).await.unwrap();
         auth.add_role_access(role_id1, proc_id1).await.unwrap();
         auth.add_role_access(role_id1, proc_id2).await.unwrap();
         auth.add_role_access(role_id1, proc_id3).await.unwrap();
-        let role_id2 = auth.create_role(api_id1, "user", true, false, 900, 604800).await.unwrap();
+        let role_id2 = auth.create_role(Uuid::new_v4(), api_id1, "user", true, false, 900, 604800).await.unwrap();
         auth.add_role_access(role_id2, proc_id1).await.unwrap();
-        let role_id3 = auth.create_role(api_id2, "user", true, false, 900, 604800).await.unwrap();
+        let role_id3 = auth.create_role(Uuid::new_v4(), api_id2, "user", true, false, 900, 604800).await.unwrap();
         auth.add_role_access(role_id3, proc_id4).await.unwrap();
 
         // get role data
@@ -121,10 +121,10 @@ mod tests {
         // create new user and add associated roles
         let password_admin = "Adm1n_P4s5w0rd";
         let password_user = "Us3r_P4s5w0rd";
-        let user_id1 = auth.create_user("administrator", "admin@mail.co", "+6281234567890", password_admin).await.unwrap();
+        let user_id1 = auth.create_user(Uuid::new_v4(), "administrator", "admin@mail.co", "+6281234567890", password_admin).await.unwrap();
         auth.add_user_role(user_id1, role_id1).await.unwrap();
         auth.add_user_role(user_id1, role_id3).await.unwrap();
-        let user_id2 = auth.create_user("username", "user@mail.co", "+6281234567890", password_user).await.unwrap();
+        let user_id2 = auth.create_user(Uuid::new_v4(), "username", "user@mail.co", "+6281234567890", password_user).await.unwrap();
         auth.add_user_role(user_id2, role_id2).await.unwrap();
         auth.add_user_role(user_id2, role_id3).await.unwrap();
 

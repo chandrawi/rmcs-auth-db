@@ -142,14 +142,13 @@ pub(crate) async fn select_user_by_role(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn insert_user(pool: &Pool<Postgres>, 
+    id: Uuid,
     name: &str, 
     email: &str,
     phone: &str,
     password: &str
 ) -> Result<Uuid, Error> 
 {
-    let user_id = Uuid::new_v4();
-
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
     let (sql, values) = Query::insert()
@@ -162,7 +161,7 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
             User::Phone
         ])
         .values([
-            user_id.into(),
+            id.into(),
             name.into(),
             password_hash.into(),
             email.into(),
@@ -175,7 +174,7 @@ pub(crate) async fn insert_user(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    Ok(user_id)
+    Ok(id)
 }
 
 pub(crate) async fn update_user(pool: &Pool<Postgres>, 

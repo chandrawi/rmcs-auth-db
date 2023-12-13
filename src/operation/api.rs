@@ -156,6 +156,7 @@ pub(crate) async fn select_api_by_category(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn insert_api(pool: &Pool<Postgres>, 
+    id: Uuid,
     name: &str, 
     address: &str, 
     category: &str, 
@@ -164,8 +165,6 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
     access_key: &[u8]
 ) -> Result<Uuid, Error> 
 {
-    let api_id = Uuid::new_v4();
-
     let password_hash = utility::hash_password(&password).or(Err(Error::WorkerCrashed))?;
 
     let (sql, values) = Query::insert()
@@ -180,7 +179,7 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
             Api::AccessKey
         ])
         .values([
-            api_id.into(),
+            id.into(),
             name.into(),
             address.into(),
             category.into(),
@@ -195,7 +194,7 @@ pub(crate) async fn insert_api(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    Ok(api_id)
+    Ok(id)
 }
 
 pub(crate) async fn update_api(pool: &Pool<Postgres>, 
@@ -363,13 +362,12 @@ pub(crate) async fn select_procedure_by_api(pool: &Pool<Postgres>,
 }
 
 pub(crate) async fn insert_procedure(pool: &Pool<Postgres>, 
+    id: Uuid,
     api_id: Uuid,
     name: &str,
     description: &str
 ) -> Result<Uuid, Error> 
 {
-    let procedure_id = Uuid::new_v4();
-
     let (sql, values) = Query::insert()
         .into_table(ApiProcedure::Table)
         .columns([
@@ -379,7 +377,7 @@ pub(crate) async fn insert_procedure(pool: &Pool<Postgres>,
             ApiProcedure::Description
         ])
         .values([
-            procedure_id.into(),
+            id.into(),
             api_id.into(),
             name.into(),
             description.into()
@@ -391,7 +389,7 @@ pub(crate) async fn insert_procedure(pool: &Pool<Postgres>,
         .execute(pool)
         .await?;
 
-    Ok(procedure_id)
+    Ok(id)
 }
 
 pub(crate) async fn update_procedure(pool: &Pool<Postgres>, 
