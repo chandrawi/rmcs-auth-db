@@ -237,7 +237,8 @@ pub(crate) async fn delete_api(pool: &Pool<Postgres>,
 pub(crate) async fn select_procedure(pool: &Pool<Postgres>, 
     id: Option<Uuid>,
     api_id: Option<Uuid>,
-    name: Option<&str>
+    name_exact: Option<&str>,
+    name_like: Option<&str>
 ) -> Result<Vec<ProcedureSchema>, Error> 
 {
     let mut stmt = Query::select()
@@ -264,7 +265,7 @@ pub(crate) async fn select_procedure(pool: &Pool<Postgres>,
     if let Some(id) = id {
         stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ProcedureId)).eq(id)).to_owned();
     }
-    else if let (Some(api_id), Some(name)) = (api_id, name) {
+    else if let (Some(api_id), Some(name)) = (api_id, name_exact) {
         stmt = stmt
             .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ApiId)).eq(api_id))
             .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::Name)).eq(name.to_owned()))
@@ -274,7 +275,7 @@ pub(crate) async fn select_procedure(pool: &Pool<Postgres>,
         if let Some(api_id) = api_id {
             stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ApiId)).eq(api_id)).to_owned();
         }
-        if let Some(name) = name {
+        if let Some(name) = name_like {
             let name_like = String::from("%") + name + "%";
             stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::Name)).like(name_like)).to_owned();
         }
