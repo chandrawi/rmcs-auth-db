@@ -8,20 +8,11 @@ use crate::schema::api::{Api, ApiProcedure, ApiSchema, ProcedureSchema};
 use crate::schema::auth_role::{Role, RoleAccess};
 use crate::utility;
 
-enum ApiSelector {
-    Id(Uuid),
-    Name(String),
-    Category(String)
-}
-
-enum ProcedureSelector {
-    Id(Uuid),
-    Name(Uuid, String),
-    Api(Uuid)
-}
-
-async fn select_api(pool: &Pool<Postgres>, 
-    selector: ApiSelector
+pub(crate) async fn select_api(pool: &Pool<Postgres>, 
+    id: Option<Uuid>,
+    name_exact: Option<&str>,
+    name_like: Option<&str>,
+    category: Option<&str>
 ) -> Result<Vec<ApiSchema>, Error>
 {
     let mut stmt = Query::select()
@@ -57,17 +48,23 @@ async fn select_api(pool: &Pool<Postgres>,
         )
         .to_owned();
 
-    match selector {
-        ApiSelector::Id(id) => {
-            stmt = stmt.and_where(Expr::col((Api::Table, Api::ApiId)).eq(id)).to_owned();
-        },
-        ApiSelector::Name(name) => {
-            stmt = stmt.and_where(Expr::col((Api::Table, Api::Name)).eq(name)).to_owned();
-        },
-        ApiSelector::Category(category) => {
-            stmt = stmt.and_where(Expr::col((Api::Table, Api::Category)).eq(category.to_string())).to_owned();
+    if let Some(id) = id {
+        stmt = stmt.and_where(Expr::col((Api::Table, Api::ApiId)).eq(id)).to_owned();
+    }
+    else if let Some(name) = name_exact {
+        stmt = stmt.and_where(Expr::col((Api::Table, Api::Name)).eq(name.to_owned())).to_owned();
+    }
+    else {
+        if let Some(name) = name_like {
+            let name_like = String::from("%") + name + "%";
+            stmt = stmt.and_where(Expr::col((Api::Table, Api::Name)).like(name_like)).to_owned();
+        }
+        if let Some(category) = category {
+            let category_like = String::from("%") + category + "%";
+            stmt = stmt.and_where(Expr::col((Api::Table, Api::Category)).like(category_like)).to_owned();
         }
     }
+
     let (sql, values) = stmt
         .order_by((Api::Table, Api::ApiId), Order::Asc)
         .order_by((ApiProcedure::Table, ApiProcedure::ProcedureId), Order::Asc)
@@ -130,29 +127,6 @@ async fn select_api(pool: &Pool<Postgres>,
         .await?;
 
     Ok(api_schema_vec)
-}
-
-pub(crate) async fn select_api_by_id(pool: &Pool<Postgres>, 
-    id: Uuid
-) -> Result<ApiSchema, Error> 
-{
-    select_api(pool, ApiSelector::Id(id)).await?.into_iter().next()
-        .ok_or(Error::RowNotFound)
-}
-
-pub(crate) async fn select_api_by_name(pool: &Pool<Postgres>, 
-    name: &str
-) -> Result<ApiSchema, Error> 
-{
-    select_api(pool, ApiSelector::Name(name.to_owned())).await?.into_iter().next()
-        .ok_or(Error::RowNotFound)
-}
-
-pub(crate) async fn select_api_by_category(pool: &Pool<Postgres>, 
-    category: &str
-) -> Result<Vec<ApiSchema>, Error> 
-{
-    select_api(pool, ApiSelector::Category(category.to_owned())).await
 }
 
 pub(crate) async fn insert_api(pool: &Pool<Postgres>, 
@@ -260,8 +234,10 @@ pub(crate) async fn delete_api(pool: &Pool<Postgres>,
     Ok(())
 }
 
-async fn select_procedure(pool: &Pool<Postgres>, 
-    selector: ProcedureSelector
+pub(crate) async fn select_procedure(pool: &Pool<Postgres>, 
+    id: Option<Uuid>,
+    api_id: Option<Uuid>,
+    name: Option<&str>
 ) -> Result<Vec<ProcedureSchema>, Error> 
 {
     let mut stmt = Query::select()
@@ -285,20 +261,25 @@ async fn select_procedure(pool: &Pool<Postgres>,
         )
         .to_owned();
 
-    match selector {
-        ProcedureSelector::Id(id) => {
-            stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ProcedureId)).eq(id)).to_owned();
-        },
-        ProcedureSelector::Name(api_id, name) => {
-            stmt = stmt
-                .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ApiId)).eq(api_id))
-                .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::Name)).eq(name))
-                .to_owned();
-        }
-        ProcedureSelector::Api(api_id) => {
+    if let Some(id) = id {
+        stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ProcedureId)).eq(id)).to_owned();
+    }
+    else if let (Some(api_id), Some(name)) = (api_id, name) {
+        stmt = stmt
+            .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ApiId)).eq(api_id))
+            .and_where(Expr::col((ApiProcedure::Table, ApiProcedure::Name)).eq(name.to_owned()))
+            .to_owned();
+    }
+    else {
+        if let Some(api_id) = api_id {
             stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ApiId)).eq(api_id)).to_owned();
         }
+        if let Some(name) = name {
+            let name_like = String::from("%") + name + "%";
+            stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::Name)).like(name_like)).to_owned();
+        }
     }
+
     let (sql, values) = stmt
         .order_by(ApiProcedure::ProcedureId, Order::Asc)
         .build_sqlx(PostgresQueryBuilder);
@@ -335,30 +316,6 @@ async fn select_procedure(pool: &Pool<Postgres>,
         .await?;
 
     Ok(proc_schema_vec)
-}
-
-pub(crate) async fn select_procedure_by_id(pool: &Pool<Postgres>, 
-    id: Uuid
-) -> Result<ProcedureSchema, Error> 
-{
-    select_procedure(pool, ProcedureSelector::Id(id)).await?.into_iter().next()
-        .ok_or(Error::RowNotFound)
-}
-
-pub(crate) async fn select_procedure_by_name(pool: &Pool<Postgres>, 
-    api_id: Uuid,
-    name: &str
-) -> Result<ProcedureSchema, Error> 
-{
-    select_procedure(pool, ProcedureSelector::Name(api_id, name.to_owned())).await?.into_iter().next()
-        .ok_or(Error::RowNotFound)
-}
-
-pub(crate) async fn select_procedure_by_api(pool: &Pool<Postgres>, 
-    api_id: Uuid
-) -> Result<Vec<ProcedureSchema>, Error> 
-{
-    select_procedure(pool, ProcedureSelector::Api(api_id)).await
 }
 
 pub(crate) async fn insert_procedure(pool: &Pool<Postgres>, 

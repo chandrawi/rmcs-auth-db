@@ -7,14 +7,15 @@ use sqlx::postgres::{Postgres, PgPoolOptions};
 use sqlx::types::chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-pub use schema::api::{ApiSchema, ProcedureSchema};
-pub use schema::auth_role::RoleSchema;
-pub use schema::auth_user::UserSchema;
-pub use schema::auth_token::TokenSchema;
 use operation::api;
 use operation::role;
 use operation::user;
 use operation::token;
+pub use schema::api::{ApiSchema, ProcedureSchema};
+pub use schema::auth_role::RoleSchema;
+pub use schema::auth_user::UserSchema;
+pub use schema::auth_token::TokenSchema;
+use token::TokenSelector;
 
 #[derive(Debug, Clone)]
 pub struct Auth {
@@ -88,21 +89,29 @@ impl Auth {
     pub async fn read_api(&self, id: Uuid)
         -> Result<ApiSchema, Error>
     {
-        api::select_api_by_id(&self.pool, id)
-        .await
+        api::select_api(&self.pool, Some(id), None, None, None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_api_by_name(&self, name: &str)
         -> Result<ApiSchema, Error>
     {
-        api::select_api_by_name(&self.pool, name)
+        api::select_api(&self.pool, None, Some(name), None, None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_api_by_name(&self, name: &str)
+        -> Result<Vec<ApiSchema>, Error>
+    {
+        api::select_api(&self.pool, None, None, Some(name), None)
         .await
     }
 
     pub async fn list_api_by_category(&self, category: &str)
         -> Result<Vec<ApiSchema>, Error>
     {
-        api::select_api_by_category(&self.pool, category).await
+        api::select_api(&self.pool, None, None, None, Some(category))
+        .await
     }
 
     pub async fn create_api(&self, id: Uuid, name: &str, address: &str, category: &str, description: &str, password: &str, access_key: &[u8])
@@ -129,21 +138,28 @@ impl Auth {
     pub async fn read_procedure(&self, id: Uuid)
         -> Result<ProcedureSchema, Error>
     {
-        api::select_procedure_by_id(&self.pool, id)
-        .await
+        api::select_procedure(&self.pool, Some(id), None, None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_procedure_by_name(&self, api_id: Uuid, name: &str)
         -> Result<ProcedureSchema, Error>
     {
-        api::select_procedure_by_name(&self.pool, api_id, name)
-        .await
+        api::select_procedure(&self.pool, None, Some(api_id), Some(name)).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn list_procedure_by_api(&self, api_id: Uuid)
         -> Result<Vec<ProcedureSchema>, Error>
     {
-        api::select_procedure_by_api(&self.pool, api_id)
+        api::select_procedure(&self.pool, None, Some(api_id), None)
+        .await
+    }
+
+    pub async fn list_procedure_by_name(&self, name: &str)
+        -> Result<Vec<ProcedureSchema>, Error>
+    {
+        api::select_procedure(&self.pool, None, None, Some(name))
         .await
     }
 
@@ -171,28 +187,35 @@ impl Auth {
     pub async fn read_role(&self, id: Uuid)
         -> Result<RoleSchema, Error>
     {
-        role::select_role_by_id(&self.pool, id)
-        .await
+        role::select_role(&self.pool, Some(id), None, None, None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_role_by_name(&self, api_id: Uuid, name: &str)
         -> Result<RoleSchema, Error>
     {
-        role::select_role_by_name(&self.pool, api_id, name)
-        .await
+        role::select_role(&self.pool, None, Some(api_id), None, Some(name)).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn list_role_by_api(&self, api_id: Uuid)
         -> Result<Vec<RoleSchema>, Error>
     {
-        role::select_role_by_api(&self.pool, api_id)
+        role::select_role(&self.pool, None, Some(api_id), None, None)
         .await
     }
 
     pub async fn list_role_by_user(&self, user_id: Uuid)
         -> Result<Vec<RoleSchema>, Error>
     {
-        role::select_role_by_user(&self.pool, user_id)
+        role::select_role(&self.pool, None, None, Some(user_id), None)
+        .await
+    }
+
+    pub async fn list_role_by_name(&self, name: &str)
+        -> Result<Vec<RoleSchema>, Error>
+    {
+        role::select_role(&self.pool, None, None, None, Some(name))
         .await
     }
 
@@ -234,21 +257,35 @@ impl Auth {
     pub async fn read_user(&self, id: Uuid)
         -> Result<UserSchema, Error>
     {
-        user::select_user_by_id(&self.pool, id)
-        .await
+        user::select_user(&self.pool, Some(id), None, None, None, None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_user_by_name(&self, name: &str)
         -> Result<UserSchema, Error>
     {
-        user::select_user_by_name(&self.pool, name)
+        user::select_user(&self.pool, None, None, None, Some(name), None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_user_by_api(&self, api_id: Uuid)
+        -> Result<Vec<UserSchema>, Error>
+    {
+        user::select_user(&self.pool, None, Some(api_id), None, None, None)
         .await
     }
 
     pub async fn list_user_by_role(&self, role_id: Uuid)
         -> Result<Vec<UserSchema>, Error>
     {
-        user::select_user_by_role(&self.pool, role_id)
+        user::select_user(&self.pool, None, None, Some(role_id), None, None)
+        .await
+    }
+
+    pub async fn list_user_by_name(&self, name: &str)
+        -> Result<Vec<UserSchema>, Error>
+    {
+        user::select_user(&self.pool, None, None, None, None, Some(name))
         .await
     }
 
@@ -290,21 +327,23 @@ impl Auth {
     pub async fn read_access_token(&self, access_id: i32)
         -> Result<TokenSchema, Error>
     {
-        token::select_token_by_access(&self.pool, access_id)
-        .await
+        match token::select_token(&self.pool, TokenSelector::Access(access_id)).await?.into_iter().next() {
+            Some(value) => Ok(value),
+            None => Err(Error::RowNotFound)
+        }
     }
 
     pub async fn list_auth_token(&self, auth_token: &str)
         -> Result<Vec<TokenSchema>, Error>
     {
-        token::select_token_by_auth(&self.pool, auth_token)
+        token::select_token(&self.pool, TokenSelector::Auth(String::from(auth_token)))
         .await
     }
 
     pub async fn list_token_by_user(&self, user_id: Uuid)
         -> Result<Vec<TokenSchema>, Error>
     {
-        token::select_token_by_user(&self.pool, user_id)
+        token::select_token(&self.pool, TokenSelector::User(user_id))
         .await
     }
 
@@ -339,21 +378,21 @@ impl Auth {
     pub async fn delete_access_token(&self, access_id: i32)
         -> Result<(), Error>
     {
-        token::delete_token_by_access(&self.pool, access_id)
+        token::delete_token(&self.pool, TokenSelector::Access(access_id))
         .await
     }
 
     pub async fn delete_auth_token(&self, auth_token: &str)
         -> Result<(), Error>
     {
-        token::delete_token_by_auth(&self.pool, auth_token)
+        token::delete_token(&self.pool, TokenSelector::Auth(auth_token.to_owned()))
         .await
     }
 
     pub async fn delete_token_by_user(&self, user_id: Uuid)
         -> Result<(), Error>
     {
-        token::delete_token_by_user(&self.pool, user_id)
+        token::delete_token(&self.pool, TokenSelector::User(user_id))
         .await
     }
 

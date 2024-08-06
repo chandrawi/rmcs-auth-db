@@ -8,13 +8,13 @@ use uuid::Uuid;
 use crate::schema::auth_token::{Token, TokenSchema};
 use crate::utility;
 
-enum TokenSelector {
+pub(crate) enum TokenSelector {
     Access(i32),
     Auth(String),
     User(Uuid)
 }
 
-async fn select_token(pool: &Pool<Postgres>, 
+pub(crate) async fn select_token(pool: &Pool<Postgres>, 
     selector: TokenSelector
 ) -> Result<Vec<TokenSchema>, Error>
 {
@@ -60,30 +60,6 @@ async fn select_token(pool: &Pool<Postgres>,
         .await?;
 
     Ok(row)
-}
-
-pub(crate) async fn select_token_by_access(pool: &Pool<Postgres>,
-    access_id: i32
-) -> Result<TokenSchema, Error>
-{
-    match select_token(pool, TokenSelector::Access(access_id)).await?.into_iter().next() {
-        Some(value) => Ok(value),
-        None => Err(Error::RowNotFound)
-    }
-}
-
-pub(crate) async fn select_token_by_auth(pool: &Pool<Postgres>,
-    auth_token: &str
-) -> Result<Vec<TokenSchema>, Error>
-{
-    select_token(pool, TokenSelector::Auth(String::from(auth_token))).await
-}
-
-pub(crate) async fn select_token_by_user(pool: &Pool<Postgres>,
-    user_id: Uuid
-) -> Result<Vec<TokenSchema>, Error>
-{
-    select_token(pool, TokenSelector::User(user_id)).await
 }
 
 pub(crate) async fn insert_token(pool: &Pool<Postgres>, 
@@ -189,7 +165,7 @@ pub(crate) async fn update_token(pool: &Pool<Postgres>,
     Ok((refresh_token, auth_token))
 }
 
-async fn delete_token(pool: &Pool<Postgres>, 
+pub(crate) async fn delete_token(pool: &Pool<Postgres>, 
     selector: TokenSelector
 ) -> Result<(), Error> 
 {
@@ -214,25 +190,4 @@ async fn delete_token(pool: &Pool<Postgres>,
         .await?;
 
     Ok(())
-}
-
-pub(crate) async fn delete_token_by_access(pool: &Pool<Postgres>,
-    access_id: i32
-) -> Result<(), Error>
-{
-    delete_token(pool, TokenSelector::Access(access_id)).await
-}
-
-pub(crate) async fn delete_token_by_auth(pool: &Pool<Postgres>,
-    auth_token: &str,
-) -> Result<(), Error>
-{
-    delete_token(pool, TokenSelector::Auth(String::from(auth_token))).await
-}
-
-pub(crate) async fn delete_token_by_user(pool: &Pool<Postgres>,
-    user_id: Uuid
-) -> Result<(), Error>
-{
-    delete_token(pool, TokenSelector::User(user_id)).await
 }

@@ -8,15 +8,11 @@ use crate::schema::auth_role::{Role, RoleAccess, RoleSchema};
 use crate::schema::api::Api;
 use crate::schema::auth_user::UserRole;
 
-enum RoleSelector {
-    Id(Uuid),
-    Name(Uuid, String),
-    Api(Uuid),
-    User(Uuid)
-}
-
-async fn select_role(pool: &Pool<Postgres>, 
-    selector: RoleSelector
+pub(crate) async fn select_role(pool: &Pool<Postgres>, 
+    id: Option<Uuid>,
+    api_id: Option<Uuid>,
+    user_id: Option<Uuid>,
+    name: Option<&str>
 ) -> Result<Vec<RoleSchema>, Error>
 {
     let mut stmt = Query::select()
@@ -50,23 +46,28 @@ async fn select_role(pool: &Pool<Postgres>,
         )
         .to_owned();
 
-    match selector {
-        RoleSelector::Id(value) => {
-            stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(value)).to_owned();
-        },
-        RoleSelector::Name(value1, value2) => {
-            stmt = stmt
-                .and_where(Expr::col((Role::Table, Role::ApiId)).eq(value1))
-                .and_where(Expr::col((Role::Table, Role::Name)).eq(value2))
-                .to_owned();
-        },
-        RoleSelector::Api(value) => {
-            stmt = stmt.and_where(Expr::col((Role::Table, Role::ApiId)).eq(value)).to_owned();
-        },
-        RoleSelector::User(value) => {
-            stmt = stmt.and_where(Expr::col((UserRole::Table, UserRole::UserId)).eq(value)).to_owned();
+    if let Some(id) = id {
+        stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(id)).to_owned();
+    }
+    else if let (Some(api_id), Some(name)) = (api_id, name) {
+        stmt = stmt
+            .and_where(Expr::col((Role::Table, Role::ApiId)).eq(api_id))
+            .and_where(Expr::col((Role::Table, Role::Name)).eq(name.to_owned()))
+            .to_owned();
+    }
+    else {
+        if let Some(api_id) = api_id {
+            stmt = stmt.and_where(Expr::col((Role::Table, Role::ApiId)).eq(api_id)).to_owned();
+        }
+        if let Some(user_id) = user_id {
+            stmt = stmt.and_where(Expr::col((UserRole::Table, UserRole::UserId)).eq(user_id)).to_owned();
+        }
+        if let Some(name) = name {
+            let name_like = String::from("%") + name + "%";
+            stmt = stmt.and_where(Expr::col((Api::Table, Api::Name)).like(name_like)).to_owned();
         }
     }
+
     let (sql, values) = stmt
         .order_by((Role::Table, Role::RoleId), Order::Asc)
         .order_by((RoleAccess::Table, RoleAccess::ProcedureId), Order::Asc)
@@ -113,37 +114,6 @@ async fn select_role(pool: &Pool<Postgres>,
         .await?;
 
     Ok(role_schema_vec)
-}
-
-pub(crate) async fn select_role_by_id(pool: &Pool<Postgres>, 
-    id: Uuid
-) -> Result<RoleSchema, Error> 
-{
-    select_role(pool, RoleSelector::Id(id)).await?.into_iter().next()
-        .ok_or(Error::RowNotFound)
-}
-
-pub(crate) async fn select_role_by_name(pool: &Pool<Postgres>, 
-    api_id: Uuid,
-    name: &str
-) -> Result<RoleSchema, Error> 
-{
-    select_role(pool, RoleSelector::Name(api_id, name.to_owned())).await?.into_iter().next()
-        .ok_or(Error::RowNotFound)
-}
-
-pub(crate) async fn select_role_by_api(pool: &Pool<Postgres>, 
-    api_id: Uuid
-) -> Result<Vec<RoleSchema>, Error> 
-{
-    select_role(pool, RoleSelector::Api(api_id)).await
-}
-
-pub(crate) async fn select_role_by_user(pool: &Pool<Postgres>, 
-    user_id: Uuid
-) -> Result<Vec<RoleSchema>, Error> 
-{
-    select_role(pool, RoleSelector::User(user_id)).await
 }
 
 pub(crate) async fn insert_role(pool: &Pool<Postgres>, 

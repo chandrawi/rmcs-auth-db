@@ -9,14 +9,12 @@ use crate::schema::auth_role::Role;
 use crate::schema::api::Api;
 use crate::utility;
 
-enum UserSelector {
-    Id(Uuid),
-    Name(String),
-    Role(Uuid)
-}
-
-async fn select_user(pool: &Pool<Postgres>, 
-    selector: UserSelector
+pub(crate) async fn select_user(pool: &Pool<Postgres>, 
+    id: Option<Uuid>,
+    api_id: Option<Uuid>,
+    role_id: Option<Uuid>,
+    name_exact: Option<&str>,
+    name_like: Option<&str>
 ) -> Result<Vec<UserSchema>, Error>
 {
     let mut stmt = Query::select()
@@ -53,17 +51,25 @@ async fn select_user(pool: &Pool<Postgres>,
         )
         .to_owned();
 
-    match selector {
-        UserSelector::Id(value) => {
-            stmt = stmt.and_where(Expr::col((User::Table, User::UserId)).eq(value)).to_owned();
-        },
-        UserSelector::Name(value) => {
-            stmt = stmt.and_where(Expr::col((User::Table, User::Name)).eq(value)).to_owned();
+    if let Some(id) = id {
+        stmt = stmt.and_where(Expr::col((User::Table, User::UserId)).eq(id)).to_owned();
+    }
+    else if let Some(name) = name_exact {
+        stmt = stmt.and_where(Expr::col((User::Table, User::Name)).eq(name.to_owned())).to_owned();
+    }
+    else {
+        if let Some(api_id) = api_id {
+            stmt = stmt.and_where(Expr::col((Api::Table, Api::ApiId)).eq(api_id)).to_owned();
         }
-        UserSelector::Role(value) => {
-            stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(value)).to_owned();
+        if let Some(role_id) = role_id {
+            stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(role_id)).to_owned();
+        }
+        if let Some(name) = name_like {
+            let name_like = String::from("%") + name + "%";
+            stmt = stmt.and_where(Expr::col((User::Table, User::Name)).like(name_like)).to_owned();
         }
     }
+
     let (sql, values) = stmt
         .order_by((User::Table, User::UserId), Order::Asc)
         .order_by((UserRole::Table, UserRole::RoleId), Order::Asc)
@@ -110,35 +116,6 @@ async fn select_user(pool: &Pool<Postgres>,
         .await?;
 
     Ok(user_schema_vec)
-}
-
-pub(crate) async fn select_user_by_id(pool: &Pool<Postgres>,
-    id: Uuid
-) -> Result<UserSchema, Error>
-{
-    let users = select_user(pool, UserSelector::Id(id)).await;
-    match users {
-        Ok(value) => value.into_iter().next().ok_or(Error::RowNotFound),
-        Err(e) => Err(e)
-    }
-}
-
-pub(crate) async fn select_user_by_name(pool: &Pool<Postgres>,
-    name: &str
-) -> Result<UserSchema, Error>
-{
-    let users = select_user(pool, UserSelector::Name(name.to_owned())).await;
-    match users {
-        Ok(value) => value.into_iter().next().ok_or(Error::RowNotFound),
-        Err(e) => Err(e)
-    }
-}
-
-pub(crate) async fn select_user_by_role(pool: &Pool<Postgres>,
-    role_id: Uuid
-) -> Result<Vec<UserSchema>, Error>
-{
-    select_user(pool, UserSelector::Role(role_id)).await
 }
 
 pub(crate) async fn insert_user(pool: &Pool<Postgres>, 
