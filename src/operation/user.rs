@@ -11,6 +11,7 @@ use crate::utility;
 
 pub(crate) async fn select_user(pool: &Pool<Postgres>, 
     id: Option<Uuid>,
+    ids: Option<&[Uuid]>,
     api_id: Option<Uuid>,
     role_id: Option<Uuid>,
     name_exact: Option<&str>,
@@ -53,6 +54,9 @@ pub(crate) async fn select_user(pool: &Pool<Postgres>,
 
     if let Some(id) = id {
         stmt = stmt.and_where(Expr::col((User::Table, User::UserId)).eq(id)).to_owned();
+    }
+    else if let Some(ids) = ids {
+        stmt = stmt.and_where(Expr::col((User::Table, User::UserId)).is_in(ids.to_vec())).to_owned();
     }
     else if let Some(name) = name_exact {
         stmt = stmt.and_where(Expr::col((User::Table, User::Name)).eq(name.to_owned())).to_owned();

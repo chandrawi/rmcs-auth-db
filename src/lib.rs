@@ -89,35 +89,42 @@ impl Auth {
     pub async fn read_api(&self, id: Uuid)
         -> Result<ApiSchema, Error>
     {
-        api::select_api(&self.pool, Some(id), None, None, None).await?
+        api::select_api(&self.pool, Some(id), None, None, None, None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_api_by_name(&self, name: &str)
         -> Result<ApiSchema, Error>
     {
-        api::select_api(&self.pool, None, Some(name), None, None).await?
+        api::select_api(&self.pool, None, None, Some(name), None, None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_api_by_ids(&self, ids: &[Uuid])
+        -> Result<Vec<ApiSchema>, Error>
+    {
+        api::select_api(&self.pool, None, Some(ids), None, None, None)
+        .await
     }
 
     pub async fn list_api_by_name(&self, name: &str)
         -> Result<Vec<ApiSchema>, Error>
     {
-        api::select_api(&self.pool, None, None, Some(name), None)
+        api::select_api(&self.pool, None, None, None, Some(name), None)
         .await
     }
 
     pub async fn list_api_by_category(&self, category: &str)
         -> Result<Vec<ApiSchema>, Error>
     {
-        api::select_api(&self.pool, None, None, None, Some(category))
+        api::select_api(&self.pool, None, None, None, None, Some(category))
         .await
     }
 
     pub async fn list_api_option(&self, name: Option<&str>, category: Option<&str>)
         -> Result<Vec<ApiSchema>, Error>
     {
-        api::select_api(&self.pool, None, None, name, category)
+        api::select_api(&self.pool, None, None, None, name, category)
         .await
     }
 
@@ -145,35 +152,42 @@ impl Auth {
     pub async fn read_procedure(&self, id: Uuid)
         -> Result<ProcedureSchema, Error>
     {
-        api::select_procedure(&self.pool, Some(id), None, None, None).await?
+        api::select_procedure(&self.pool, Some(id), None, None, None, None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_procedure_by_name(&self, api_id: Uuid, name: &str)
         -> Result<ProcedureSchema, Error>
     {
-        api::select_procedure(&self.pool, None, Some(api_id), Some(name), None).await?
+        api::select_procedure(&self.pool, None, None, Some(api_id), Some(name), None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_procedure_by_ids(&self, ids: &[Uuid])
+        -> Result<Vec<ProcedureSchema>, Error>
+    {
+        api::select_procedure(&self.pool, None, Some(ids), None, None, None)
+        .await
     }
 
     pub async fn list_procedure_by_api(&self, api_id: Uuid)
         -> Result<Vec<ProcedureSchema>, Error>
     {
-        api::select_procedure(&self.pool, None, Some(api_id), None, None)
+        api::select_procedure(&self.pool, None, None, Some(api_id), None, None)
         .await
     }
 
     pub async fn list_procedure_by_name(&self, name: &str)
         -> Result<Vec<ProcedureSchema>, Error>
     {
-        api::select_procedure(&self.pool, None, None, None, Some(name))
+        api::select_procedure(&self.pool, None, None, None, None, Some(name))
         .await
     }
 
     pub async fn list_procedure_option(&self, api_id: Option<Uuid>, name: Option<&str>)
         -> Result<Vec<ProcedureSchema>, Error>
     {
-        api::select_procedure(&self.pool, None, api_id, None, name)
+        api::select_procedure(&self.pool, None, None, api_id, None, name)
         .await
     }
 
@@ -201,42 +215,49 @@ impl Auth {
     pub async fn read_role(&self, id: Uuid)
         -> Result<RoleSchema, Error>
     {
-        role::select_role(&self.pool, Some(id), None, None, None, None).await?
+        role::select_role(&self.pool, Some(id), None, None, None, None, None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_role_by_name(&self, api_id: Uuid, name: &str)
         -> Result<RoleSchema, Error>
     {
-        role::select_role(&self.pool, None, Some(api_id), None, Some(name), None).await?
+        role::select_role(&self.pool, None, None, Some(api_id), None, Some(name), None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_role_by_ids(&self, ids: &[Uuid])
+        -> Result<Vec<RoleSchema>, Error>
+    {
+        role::select_role(&self.pool, None, Some(ids), None, None, None, None)
+        .await
     }
 
     pub async fn list_role_by_api(&self, api_id: Uuid)
         -> Result<Vec<RoleSchema>, Error>
     {
-        role::select_role(&self.pool, None, Some(api_id), None, None, None)
+        role::select_role(&self.pool, None, None, Some(api_id), None, None, None)
         .await
     }
 
     pub async fn list_role_by_user(&self, user_id: Uuid)
         -> Result<Vec<RoleSchema>, Error>
     {
-        role::select_role(&self.pool, None, None, Some(user_id), None, None)
+        role::select_role(&self.pool, None, None, None, Some(user_id), None, None)
         .await
     }
 
     pub async fn list_role_by_name(&self, name: &str)
         -> Result<Vec<RoleSchema>, Error>
     {
-        role::select_role(&self.pool, None, None, None, None, Some(name))
+        role::select_role(&self.pool, None, None, None, None, None, Some(name))
         .await
     }
 
     pub async fn list_role_option(&self, api_id: Option<Uuid>, user_id: Option<Uuid>, name: Option<&str>)
         -> Result<Vec<RoleSchema>, Error>
     {
-        role::select_role(&self.pool, None, api_id, user_id, None, name)
+        role::select_role(&self.pool, None, None, api_id, user_id, None, name)
         .await
     }
 
@@ -278,42 +299,49 @@ impl Auth {
     pub async fn read_user(&self, id: Uuid)
         -> Result<UserSchema, Error>
     {
-        user::select_user(&self.pool, Some(id), None, None, None, None).await?
+        user::select_user(&self.pool, Some(id), None, None, None, None, None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
     }
 
     pub async fn read_user_by_name(&self, name: &str)
         -> Result<UserSchema, Error>
     {
-        user::select_user(&self.pool, None, None, None, Some(name), None).await?
+        user::select_user(&self.pool, None, None, None, None, Some(name), None).await?
         .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_user_by_ids(&self, ids: &[Uuid])
+        -> Result<Vec<UserSchema>, Error>
+    {
+        user::select_user(&self.pool, None, Some(ids), None, None, None, None)
+        .await
     }
 
     pub async fn list_user_by_api(&self, api_id: Uuid)
         -> Result<Vec<UserSchema>, Error>
     {
-        user::select_user(&self.pool, None, Some(api_id), None, None, None)
+        user::select_user(&self.pool, None, None, Some(api_id), None, None, None)
         .await
     }
 
     pub async fn list_user_by_role(&self, role_id: Uuid)
         -> Result<Vec<UserSchema>, Error>
     {
-        user::select_user(&self.pool, None, None, Some(role_id), None, None)
+        user::select_user(&self.pool, None, None, None, Some(role_id), None, None)
         .await
     }
 
     pub async fn list_user_by_name(&self, name: &str)
         -> Result<Vec<UserSchema>, Error>
     {
-        user::select_user(&self.pool, None, None, None, None, Some(name))
+        user::select_user(&self.pool, None, None, None, None, None, Some(name))
         .await
     }
 
     pub async fn list_user_option(&self, api_id: Option<Uuid>, role_id: Option<Uuid>, name: Option<&str>)
         -> Result<Vec<UserSchema>, Error>
     {
-        user::select_user(&self.pool, None, api_id, role_id, None, name)
+        user::select_user(&self.pool, None, None, api_id, role_id, None, name)
         .await
     }
 

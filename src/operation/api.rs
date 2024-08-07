@@ -10,6 +10,7 @@ use crate::utility;
 
 pub(crate) async fn select_api(pool: &Pool<Postgres>, 
     id: Option<Uuid>,
+    ids: Option<&[Uuid]>,
     name_exact: Option<&str>,
     name_like: Option<&str>,
     category: Option<&str>
@@ -50,6 +51,9 @@ pub(crate) async fn select_api(pool: &Pool<Postgres>,
 
     if let Some(id) = id {
         stmt = stmt.and_where(Expr::col((Api::Table, Api::ApiId)).eq(id)).to_owned();
+    }
+    else if let Some(ids) = ids {
+        stmt = stmt.and_where(Expr::col((Api::Table, Api::ApiId)).is_in(ids.to_vec())).to_owned();
     }
     else if let Some(name) = name_exact {
         stmt = stmt.and_where(Expr::col((Api::Table, Api::Name)).eq(name.to_owned())).to_owned();
@@ -236,6 +240,7 @@ pub(crate) async fn delete_api(pool: &Pool<Postgres>,
 
 pub(crate) async fn select_procedure(pool: &Pool<Postgres>, 
     id: Option<Uuid>,
+    ids: Option<&[Uuid]>,
     api_id: Option<Uuid>,
     name_exact: Option<&str>,
     name_like: Option<&str>
@@ -264,6 +269,9 @@ pub(crate) async fn select_procedure(pool: &Pool<Postgres>,
 
     if let Some(id) = id {
         stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ProcedureId)).eq(id)).to_owned();
+    }
+    else if let Some(ids) = ids {
+        stmt = stmt.and_where(Expr::col((ApiProcedure::Table, ApiProcedure::ProcedureId)).is_in(ids.to_vec())).to_owned();
     }
     else if let (Some(api_id), Some(name)) = (api_id, name_exact) {
         stmt = stmt

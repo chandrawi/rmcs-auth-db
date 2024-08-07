@@ -10,6 +10,7 @@ use crate::schema::auth_user::UserRole;
 
 pub(crate) async fn select_role(pool: &Pool<Postgres>, 
     id: Option<Uuid>,
+    ids: Option<&[Uuid]>,
     api_id: Option<Uuid>,
     user_id: Option<Uuid>,
     name_exact: Option<&str>,
@@ -49,6 +50,9 @@ pub(crate) async fn select_role(pool: &Pool<Postgres>,
 
     if let Some(id) = id {
         stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).eq(id)).to_owned();
+    }
+    else if let Some(ids) = ids {
+        stmt = stmt.and_where(Expr::col((Role::Table, Role::RoleId)).is_in(ids.to_vec())).to_owned();
     }
     else if let (Some(api_id), Some(name)) = (api_id, name_exact) {
         stmt = stmt
