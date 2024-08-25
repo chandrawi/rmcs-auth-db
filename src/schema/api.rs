@@ -2,7 +2,6 @@ use sea_query::Iden;
 use uuid::Uuid;
 use rmcs_auth_api::api;
 
-#[allow(unused)]
 #[derive(Iden)]
 pub(crate) enum Api {
     Table,
@@ -15,7 +14,6 @@ pub(crate) enum Api {
     AccessKey
 }
 
-#[allow(unused)]
 #[derive(Iden)]
 pub(crate) enum ApiProcedure {
     Table,

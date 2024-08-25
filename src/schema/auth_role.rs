@@ -2,7 +2,6 @@ use sea_query::Iden;
 use uuid::Uuid;
 use rmcs_auth_api::role;
 
-#[allow(unused)]
 #[derive(Iden)]
 pub(crate) enum Role {
     Table,
@@ -15,7 +14,6 @@ pub(crate) enum Role {
     RefreshDuration
 }
 
-#[allow(unused)]
 #[derive(Iden)]
 pub(crate) enum RoleAccess {
     Table,
