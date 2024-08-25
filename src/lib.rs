@@ -10,12 +10,15 @@ use uuid::Uuid;
 use operation::api;
 use operation::role;
 use operation::user;
+use operation::profile;
 use operation::token;
 pub use schema::api::{ApiSchema, ProcedureSchema};
 pub use schema::auth_role::RoleSchema;
 pub use schema::auth_user::UserSchema;
 pub use schema::auth_token::TokenSchema;
+pub use schema::profile::{RoleProfileSchema, UserProfileSchema, ProfileMode};
 use token::TokenSelector;
+use rmcs_resource_db::schema::value::{DataValue, DataType};
 
 #[derive(Debug, Clone)]
 pub struct Auth {
@@ -296,6 +299,41 @@ impl Auth {
         .await
     }
 
+    pub async fn read_role_profile(&self, id: i32)
+        -> Result<RoleProfileSchema, Error>
+    {
+        profile::select_role_profile(&self.pool, Some(id), None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_role_profile_by_role(&self, role_id: Uuid)
+        -> Result<Vec<RoleProfileSchema>, Error>
+    {
+        profile::select_role_profile(&self.pool, None, Some(role_id))
+        .await
+    }
+
+    pub async fn create_role_profile(&self, role_id: Uuid, name: &str, value_type: DataType, mode: ProfileMode)
+        -> Result<i32, Error>
+    {
+        profile::insert_role_profile(&self.pool, role_id, name, value_type, mode)
+        .await
+    }
+
+    pub async fn update_role_profile(&self, id: i32, name: Option<&str>, value_type: Option<DataType>, mode: Option<ProfileMode>)
+        -> Result<(), Error>
+    {
+        profile::update_role_profile(&self.pool, id, name, value_type, mode)
+        .await
+    }
+
+    pub async fn delete_role_profile(&self, id: i32)
+        -> Result<(), Error>
+    {
+        profile::delete_role_profile(&self.pool, id)
+        .await
+    }
+
     pub async fn read_user(&self, id: Uuid)
         -> Result<UserSchema, Error>
     {
@@ -377,6 +415,41 @@ impl Auth {
         -> Result<(), Error>
     {
         user::remove_user_role(&self.pool, id, role_id)
+        .await
+    }
+
+    pub async fn read_user_profile(&self, id: i32)
+        -> Result<UserProfileSchema, Error>
+    {
+        profile::select_user_profile(&self.pool, Some(id), None).await?
+        .into_iter().next().ok_or(Error::RowNotFound)
+    }
+
+    pub async fn list_user_profile_by_user(&self, user_id: Uuid)
+        -> Result<Vec<UserProfileSchema>, Error>
+    {
+        profile::select_user_profile(&self.pool, None, Some(user_id))
+        .await
+    }
+
+    pub async fn create_user_profile(&self, user_id: Uuid, name: &str, value: DataValue)
+        -> Result<i32, Error>
+    {
+        profile::insert_user_profile(&self.pool, user_id, name, value)
+        .await
+    }
+
+    pub async fn update_user_profile(&self, id: i32, name: Option<&str>, value: Option<DataValue>)
+        -> Result<(), Error>
+    {
+        profile::update_user_profile(&self.pool, id, name, value)
+        .await
+    }
+
+    pub async fn delete_user_profile(&self, id: i32)
+        -> Result<(), Error>
+    {
+        profile::delete_user_profile(&self.pool, id)
         .await
     }
 
