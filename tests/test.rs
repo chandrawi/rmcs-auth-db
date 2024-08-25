@@ -20,7 +20,7 @@ mod tests {
 
     async fn truncate_tables(pool: &Pool<Postgres>) -> Result<(), Error>
     {
-        let sql = "TRUNCATE TABLE \"token\", \"user_role\", \"user\", \"role_access\", \"role\", \"api_procedure\", \"api\";";
+        let sql = "TRUNCATE TABLE \"profile_user\", \"profile_role\", \"token\", \"user_role\", \"user\", \"role_access\", \"role\", \"api_procedure\", \"api\";";
         sqlx::query(sql)
             .execute(pool)
             .await?;
