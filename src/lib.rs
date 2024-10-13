@@ -453,6 +453,13 @@ impl Auth {
         .await
     }
 
+    pub async fn swap_user_profile(&self, user_id: Uuid, name: &str, order_1: i16, order_2: i16)
+        -> Result<(), Error>
+    {
+        profile::swap_user_profile(&self.pool, user_id, name, order_1, order_2)
+        .await
+    }
+
     pub async fn read_access_token(&self, access_id: i32)
         -> Result<TokenSchema, Error>
     {

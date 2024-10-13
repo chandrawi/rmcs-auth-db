@@ -1,3 +1,5 @@
+use std::i16;
+
 use sqlx::{Pool, Row, Error};
 use sqlx::postgres::{Postgres, PgRow};
 use sea_query::{PostgresQueryBuilder, Query, Expr, Func};
@@ -20,6 +22,7 @@ pub(crate) async fn select_role_profile(pool: &Pool<Postgres>,
             (ProfileRole::Table, ProfileRole::Type),
             (ProfileRole::Table, ProfileRole::Mode)
         ])
+        .from(ProfileRole::Table)
         .to_owned();
 
     if let Some(id) = id {
@@ -150,6 +153,7 @@ pub(crate) async fn select_user_profile(pool: &Pool<Postgres>,
             (ProfileUser::Table, ProfileUser::Value),
             (ProfileUser::Table, ProfileUser::Type)
         ])
+        .from(ProfileUser::Table)
         .to_owned();
 
     if let Some(id) = id {
@@ -199,6 +203,8 @@ pub(crate) async fn insert_user_profile(pool: &Pool<Postgres>,
     // new profile order is max order of profile with input user_id and name plus one
     // new profile order is zero if no profile with input user_id and name found
     let order = order + 1;
+    println!("SQL\n{:?}", sql);
+    println!("Order\n{:?}", order);
 
     let bytes = value.to_bytes();
     let type_ = i16::from(value.get_type());
@@ -282,6 +288,43 @@ pub(crate) async fn delete_user_profile(pool: &Pool<Postgres>,
     sqlx::query_with(&sql, values)
         .execute(pool)
         .await?;
+
+    Ok(())
+}
+
+async fn update_user_profile_order(pool: &Pool<Postgres>,
+    user_id: Uuid,
+    name: &str,
+    order: i16,
+    order_new: i16
+) -> Result<(), Error>
+{
+    let (sql, values) = Query::update()
+        .table(ProfileUser::Table)
+        .value(ProfileUser::Order, order_new).to_owned()
+        .and_where(Expr::col(ProfileUser::UserId).eq(user_id))
+        .and_where(Expr::col(ProfileUser::Name).eq(name))
+        .and_where(Expr::col(ProfileUser::Order).eq(order))
+        .build_sqlx(PostgresQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub(crate) async fn swap_user_profile(pool: &Pool<Postgres>, 
+    user_id: Uuid,
+    name: &str,
+    order_1: i16,
+    order_2: i16
+) -> Result<(), Error>
+{
+    // change order_1 to max first before change order_2 to correctly swap order
+    update_user_profile_order(pool, user_id, name, order_1, i16::MAX).await?;
+    update_user_profile_order(pool, user_id, name, order_2, order_1).await?;
+    update_user_profile_order(pool, user_id, name, i16::MAX, order_2).await?;
 
     Ok(())
 }
