@@ -203,8 +203,6 @@ pub(crate) async fn insert_user_profile(pool: &Pool<Postgres>,
     // new profile order is max order of profile with input user_id and name plus one
     // new profile order is zero if no profile with input user_id and name found
     let order = order + 1;
-    println!("SQL\n{:?}", sql);
-    println!("Order\n{:?}", order);
 
     let bytes = value.to_bytes();
     let type_ = i16::from(value.get_type());

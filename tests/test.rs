@@ -7,6 +7,8 @@ mod tests {
     use argon2::{Argon2, PasswordHash, PasswordVerifier};
     use rmcs_auth_db::Auth;
     use rmcs_auth_db::utility::generate_access_key;
+    use rmcs_auth_db::ProfileMode::*;
+    use rmcs_resource_db::{DataType::*, DataValue::*};
 
     async fn get_connection_pool() -> Result<Pool<Postgres>, Error>
     {
@@ -30,7 +32,7 @@ mod tests {
     #[sqlx::test]
     async fn test_auth()
     {
-        // std::env::set_var("RUST_BACKTRACE", "1");
+        std::env::set_var("RUST_BACKTRACE", "1");
 
         let pool = get_connection_pool().await.unwrap();
         let auth = Auth::new_with_pool(pool);
@@ -151,6 +153,29 @@ mod tests {
 
         assert_ne!(user.password, hash);
 
+        // create role and user profile
+        let profile_role_id1 = auth.create_role_profile(role_id1, "name", StringT, SingleRequired).await.unwrap();
+        let profile_role_id2 = auth.create_role_profile(role_id1, "age", U16T, SingleOptional).await.unwrap();
+        let profile_user_id1 = auth.create_user_profile(user_id1, "name", String("john doe".to_owned())).await.unwrap();
+        let profile_user_id2 = auth.create_user_profile(user_id1, "age", U16(20)).await.unwrap();
+
+        // read role and user profile
+        let profile_role1 = auth.read_role_profile(profile_role_id1).await.unwrap();
+        let profile_role2 = auth.read_role_profile(profile_role_id2).await.unwrap();
+        let profile_user1 = auth.read_user_profile(profile_user_id1).await.unwrap();
+        let profile_users = auth.list_user_profile_by_user(user_id1).await.unwrap();
+
+        assert_eq!(profile_role1.name, "name");
+        assert_eq!(profile_role2.mode, SingleOptional);
+        assert_eq!(profile_user1.value, String("john doe".to_owned()));
+        assert!(profile_users.contains(&profile_user1));
+
+        // update user profile
+        auth.update_user_profile(profile_user_id2, None, Some(U16(21))).await.unwrap();
+        let profile_user2 = auth.read_user_profile(profile_user_id2).await.unwrap();
+
+        assert_eq!(profile_user2.value, U16(21));
+
         // create new access token and refresh token
         let expire1 = DateTime::parse_from_str("2023-01-01 00:00:00 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap().into();
         let expire2 = DateTime::parse_from_str("2023-01-01 12:00:00 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap().into();
@@ -186,6 +211,17 @@ mod tests {
         assert_eq!(new_access_token.expire, expire3);
         assert_eq!(new_auth_token.expire, expire3);
         assert_eq!(new_auth_token.ip, [192, 168, 0, 100]);
+
+        // delete role and user profile
+        auth.delete_user_profile(profile_user_id1).await.unwrap();
+        auth.delete_role_profile(profile_role_id1).await.unwrap();
+
+        // check if role and user profile already deleted
+        let result_profile_user = auth.read_role_profile(profile_user_id1).await;
+        let result_profile_role = auth.read_role_profile(profile_role_id1).await;
+
+        assert!(result_profile_user.is_err());
+        assert!(result_profile_role.is_err());
 
         // try to delete resource API, procedure role and user without removing dependent item
         let try_role = auth.delete_role(role_id3).await;
