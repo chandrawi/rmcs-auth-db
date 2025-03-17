@@ -103,12 +103,12 @@ pub(crate) async fn insert_token(pool: &Pool<Postgres>,
             Token::Ip
         ])
         .to_owned();
-    for gen in gens.clone() {
+    for generate in gens.clone() {
         stmt = stmt.values([
-            gen.0.into(),
+            generate.0.into(),
             user_id.into(),
-            gen.1.into(),
-            gen.2.into(),
+            generate.1.into(),
+            generate.2.into(),
             expire.into(),
             ip.to_vec().into()
         ])

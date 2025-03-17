@@ -12,7 +12,7 @@ pub(crate) fn hash_password(password: &str) -> Result<String, argon2::password_h
 
 pub fn generate_access_key() -> Vec<u8>
 {
-    (0..32).map(|_| thread_rng().gen()).collect()
+    (0..32).map(|_| thread_rng().gen_range(0..255)).collect()
 }
 
 pub fn generate_token_string() -> String

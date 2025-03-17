@@ -32,7 +32,7 @@ mod tests {
     #[sqlx::test]
     async fn test_auth()
     {
-        std::env::set_var("RUST_BACKTRACE", "1");
+        unsafe { std::env::set_var("RUST_BACKTRACE", "1"); }
 
         let pool = get_connection_pool().await.unwrap();
         let auth = Auth::new_with_pool(pool);
@@ -217,7 +217,7 @@ mod tests {
         auth.delete_role_profile(profile_role_id1).await.unwrap();
 
         // check if role and user profile already deleted
-        let result_profile_user = auth.read_role_profile(profile_user_id1).await;
+        let result_profile_user = auth.read_user_profile(profile_user_id1).await;
         let result_profile_role = auth.read_role_profile(profile_role_id1).await;
 
         assert!(result_profile_user.is_err());
