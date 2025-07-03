@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "user" (
   "user_id" uuid NOT NULL,
-  "name" varchar(64) NOT NULL,
+  "name" varchar(128) NOT NULL,
   "email" varchar(128) NOT NULL,
   "phone" varchar(32) NOT NULL,
   "password" varchar(128) NOT NULL,

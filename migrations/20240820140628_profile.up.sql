@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "profile_role" (
   "id" serial NOT NULL,
   "role_id" uuid NOT NULL,
-  "name" varchar(64) NOT NULL,
+  "name" varchar(128) NOT NULL,
   "type" smallint NOT NULL DEFAULT 0,
   "mode" smallint NOT NULL DEFAULT 0,
   PRIMARY KEY ("id"),
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS "profile_role" (
 CREATE TABLE IF NOT EXISTS "profile_user" (
   "id" serial NOT NULL,
   "user_id" uuid NOT NULL,
-  "name" varchar(64) NOT NULL,
+  "name" varchar(128) NOT NULL,
   "order" smallint NOT NULL DEFAULT 0,
   "value" bytea NOT NULL,
   "type" smallint NOT NULL DEFAULT 0,

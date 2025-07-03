@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "role" (
   "role_id" uuid NOT NULL,
   "api_id" uuid NOT NULL,
-  "name" varchar(64) NOT NULL,
+  "name" varchar(128) NOT NULL,
   "multi" boolean NOT NULL DEFAULT true,
   "ip_lock" boolean NOT NULL DEFAULT false,
   "access_duration" int NOT NULL,
